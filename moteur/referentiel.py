@@ -24,7 +24,6 @@ from typing import Any, Dict, List, Optional
 from openpyxl import load_workbook
 
 FEUILLES_PARAMETRES = ["Cultures", "Equipement", "Acces_ressource", "Ressources"]
-LIBELLES_FIABILITE = {"D": "Documenté", "C": "Calculé", "E": "Estimé"}
 
 
 def slug(texte: str) -> str:
@@ -133,11 +132,9 @@ class Referentiel:
         return self.references.get(ref_id)
 
     def infobulle(self, p: Param) -> str:
-        """Texte d'info-bulle : citation APA, fiabilité et précision."""
+        """Texte d'info-bulle : citation APA et précision."""
         ref = self.reference(p.ref_id)
-        morceaux = [ref.citation if ref else f"(réf. {p.ref_id or 'non renseignée'})"]
-        morceaux.append(f"{LIBELLES_FIABILITE.get(p.fiabilite, p.fiabilite)} [{p.fiabilite}]")
-        texte = " · ".join(morceaux)
+        texte = ref.citation if ref else f"(réf. {p.ref_id or 'non renseignée'})"
         if p.precision:
             texte += f" — {p.precision}"
         return texte

@@ -34,7 +34,7 @@
       <li role="presentation"><button id="tab-equipement" class="fr-tabs__tab fr-icon-settings-5-line fr-tabs__tab--icon-left" tabindex="-1" role="tab" aria-selected="false" aria-controls="panel-equipement">Équipement</button></li>
       <li role="presentation"><button id="tab-acces" class="fr-tabs__tab fr-icon-drop-line fr-tabs__tab--icon-left" tabindex="-1" role="tab" aria-selected="false" aria-controls="panel-acces">Accès à la ressource en eau</button></li>
       <li role="presentation"><button id="tab-ressources" class="fr-tabs__tab fr-icon-money-euro-circle-line fr-tabs__tab--icon-left" tabindex="-1" role="tab" aria-selected="false" aria-controls="panel-ressources">Ressources</button></li>
-      <li role="presentation"><button id="tab-analyse" class="fr-tabs__tab fr-icon-lightbulb-line fr-tabs__tab--icon-left" tabindex="-1" role="tab" aria-selected="false" aria-controls="panel-analyse">Analyse</button></li>
+      <li role="presentation"><button id="tab-methode" class="fr-tabs__tab fr-icon-book-2-line fr-tabs__tab--icon-left" tabindex="-1" role="tab" aria-selected="false" aria-controls="panel-methode">Méthode</button></li>
     </ul>
 
     {# ===================================================================== #}
@@ -83,7 +83,7 @@
                 <div class="fr-select-group">
                   <label class="fr-label" for="culture">Culture irriguée</label>
                   <select class="fr-select" id="culture">
-                    {% for c in ref.cultures %}<option value="{{ c }}" {% if c == CULTURE_DEFAUT %}selected{% endif %}>{{ c }}{% if c in catalogue and catalogue[c].complet %} · cartes disponibles{% endif %}</option>{% endfor %}
+                    {% for c in ref.cultures %}<option value="{{ c }}" {% if c == CULTURE_DEFAUT %}selected{% endif %}>{{ c }}</option>{% endfor %}
                   </select>
                 </div>
               </div>
@@ -300,12 +300,9 @@
           <div class="fr-col-12 fr-col-md-4">
             <div class="indicateur">
               <p class="indicateur__libelle">{{ libelle }}</p>
-              <p class="indicateur__valeur"><span class="valeur-sourcee" tabindex="0" id="{{ id }}" aria-describedby="{{ id }}-tt">–</span> <span class="indicateur__unite">{{ unite }}</span></p>
-              {{ m.infobulle(id ~ '-tt', '–') }}
-              {% if id == 'agro-volume' %}<p class="indicateur__complement" id="{{ id }}-cpl"></p>{% endif %}
               {% if id == 'agro-besoin' %}
-              <fieldset class="fr-fieldset fr-mt-1w fr-mb-0" id="methode-besoin" aria-labelledby="leg-methode-besoin">
-                <legend class="fr-fieldset__legend--regular fr-fieldset__legend fr-text--xs fr-pb-0" id="leg-methode-besoin">Méthode d'estimation</legend>
+              <fieldset class="fr-fieldset fr-mb-1w" id="methode-besoin" aria-labelledby="leg-methode-besoin">
+                <legend class="fr-sr-only" id="leg-methode-besoin">Méthode d'estimation du besoin en eau</legend>
                 {% for val, lib in [('carte', 'Carte'), ('sgpe', 'SGPE'), ('reference', 'Référence')] %}
                 <div class="fr-fieldset__element fr-fieldset__element--inline fr-mb-0">
                   <div class="fr-radio-group fr-radio-group--sm">
@@ -315,8 +312,11 @@
                 </div>
                 {% endfor %}
               </fieldset>
-              <p class="fr-hint-text fr-mb-0" id="methode-besoin-aide"></p>
               {% endif %}
+              <p class="indicateur__valeur"><span class="valeur-sourcee" tabindex="0" id="{{ id }}" aria-describedby="{{ id }}-tt">–</span> <span class="indicateur__unite">{{ unite }}</span></p>
+              {{ m.infobulle(id ~ '-tt', '–') }}
+              {% if id == 'agro-volume' %}<p class="indicateur__complement" id="{{ id }}-cpl"></p>{% endif %}
+              {% if id == 'agro-besoin' %}<p class="fr-hint-text fr-mb-0" id="methode-besoin-aide"></p>{% endif %}
             </div>
           </div>
           {% endfor %}
@@ -561,133 +561,131 @@
     </div>
 
     {# ===================================================================== #}
-    {#                                ANALYSE                                #}
+    {#                                MÉTHODE                                #}
     {# ===================================================================== #}
-    <div id="panel-analyse" class="fr-tabs__panel" role="tabpanel" aria-labelledby="tab-analyse" tabindex="0">
-      <h2 class="fr-h4">Limites de la modélisation et éléments de réflexion</h2>
+    <div id="panel-methode" class="fr-tabs__panel methode" role="tabpanel" aria-labelledby="tab-methode" tabindex="0">
+      <h2 class="fr-h4">Méthode de calcul</h2>
+      <p>Le modèle calcule, pour une année moyenne, le <strong>coût annuel de l'irrigation</strong> (somme de cinq
+        postes) et le <strong>gain de rendement</strong> qu'elle procure. Le bilan est leur différence :</p>
+      <p class="methode__formule"><code>Bilan (€/an) = gain lié à l'irrigation − (énergie + redevance + équipement + main-d'œuvre + accès à la ressource)</code></p>
 
-      <div class="fr-accordions-group fr-mt-3w">
+      <h3 class="fr-h5 fr-mt-5w">1. Besoin en eau et volume prélevé</h3>
+      <p>Le besoin en eau d'irrigation (mm) est estimé selon la méthode choisie :</p>
+      <ul>
+        <li><strong>Carte</strong> : moyenne des mailles du modèle agronomique qui touchent la commune (scénario RCP4.5, narratif « violet » d'Explore2) ;</li>
+        <li><strong>SGPE</strong> : <code>Σ max(0, ETP × Kc − P)</code> sur les mois où la culture est en place (Kc &gt; 0), avec l'ETP et les pluies DRIAS (RCP4.5, 2021-2050) du point de grille le plus proche ;</li>
+        <li><strong>Référence</strong> : valeur moyenne du référentiel pour la culture.</li>
+      </ul>
+      <p class="methode__formule"><code>Volume prélevé (m³) = besoin (mm) × 10 × surface (ha) ÷ efficience du matériel</code></p>
+      <p class="fr-text--bold fr-mb-1v">Limites</p>
+      <ul class="methode__limites">
+        <li>Besoin d'une année moyenne : les années sèches, qui dimensionnent réellement l'installation, ne sont pas simulées.</li>
+        <li>Méthode SGPE : toute la pluie est jugée utile et la réserve en eau du sol est ignorée.</li>
+        <li>Efficience fixe par matériel, indépendante du pilotage, du vent ou du sol.</li>
+        <li>Aucune restriction de prélèvement (arrêtés sécheresse, volume autorisé) n'est prise en compte.</li>
+      </ul>
 
-        <section class="fr-accordion">
-          <h3 class="fr-accordion__title"><button type="button" class="fr-accordion__btn" aria-expanded="false" aria-controls="an-formules">Formules du coût annuel</button></h3>
-          <div class="fr-collapse" id="an-formules">
-            <p>Le coût annuel de l'irrigation (onglet Simulation, tuile « Coût de l'irrigation ») est la somme brute de
-              cinq postes, sans pondération supplémentaire :</p>
-            <ul>
-              <li><strong>Redevance de l'agence de l'eau</strong> = volume prélevé × taux de redevance (catégorie 1 ou
-                2 selon le zonage ZRE, origine souterraine ou superficielle), si le volume dépasse le seuil
-                d'assujettissement ou si l'accès est collectif ; nulle sinon.</li>
-              <li><strong>Énergie</strong> = volume facturé × prix forfaitaire de l'énergie de pompage (7 c€/m³,
-                CGEDD 2020) ; nulle si l'eau est livrée sous pression (réseau collectif, ASA), le coût étant alors déjà
-                compris dans la part volumétrique de l'accès. Le volume facturé et sa composition sont détaillés
-                ci-dessous.</li>
-              <li><strong>Équipement</strong> = (CAPEX du matériel d'irrigation net de subvention × facteur
-                d'annualisation) + coût de maintenance annuel.</li>
-              <li><strong>Main-d'œuvre</strong> = coût de main-d'œuvre propre à l'équipement (€/ha/an) × surface
-                irriguée.</li>
-              <li><strong>Accès à la ressource</strong> = (CAPEX de l'ouvrage et du réseau d'amenée, net de subvention,
-                × facteur d'annualisation) + part fixe + part volumétrique + frais supplémentaires propres à la
-                source d'eau.</li>
-            </ul>
-            <p>Le facteur d'annualisation ramène un investissement initial (CAPEX) à une annuité constante sur sa durée
-              de vie, au taux d'actualisation retenu : <code>i·(1+i)ⁿ / ((1+i)ⁿ − 1)</code>, ou <code>1/n</code> si le
-              taux est nul. Il est calculé séparément pour le matériel d'irrigation et pour l'ouvrage d'accès (durées de
-              vie et taux distincts) — voir les onglets Équipement et Accès à la ressource.</p>
+      <h3 class="fr-h5 fr-mt-5w">2. Gain lié à l'irrigation</h3>
+      <p class="methode__formule"><code>Gain (€/an) = (rendement irrigué − rendement pluvial) (q/ha) × 0,1 × prix de vente (€/t) × surface (ha)</code></p>
+      <p class="fr-text--bold fr-mb-1v">Limites</p>
+      <ul class="methode__limites">
+        <li>Prix de vente fixe : la volatilité des cours n'est pas représentée.</li>
+        <li>Seul le tonnage est valorisé, pas la qualité (calibre, protéines, sucre) ni la régularité de livraison.</li>
+        <li>Ni la sécurisation du revenu, ni les effets sur l'assolement ne sont valorisés.</li>
+        <li>Sans objet pour les cultures où l'irrigation est une condition d'existence (rendement pluvial arbitraire).</li>
+      </ul>
 
-            <h4 class="fr-h6 fr-mt-3w">Volume prélevé et volume de remplissage : deux notions distinctes</h4>
-            <p>Le <strong>volume prélevé</strong> est le volume d'eau qu'il faut retirer de la source pour satisfaire le
-              besoin d'irrigation de la parcelle : <code>volume prélevé = besoin (mm) × 10 × surface (ha) ÷ efficience
-              du matériel</code>. C'est ce volume qui sert de base à la redevance, à la part volumétrique de l'accès et
-              au bilan agronomique affiché dans l'onglet Simulation (« Volume total d'eau d'irrigation »).</p>
-            <p>Le <strong>volume de remplissage par pompage</strong> n'existe que pour une source de type retenue : il
-              représente le volume qu'il faut pomper depuis le milieu naturel (rivière, nappe) pour remplir la retenue,
-              en plus du volume ensuite repris dans la retenue pour irriguer. C'est donc un second pompage, physiquement
-              distinct du premier : dans le modèle, il est estimé comme le volume utile de la retenue rapporté à un
-              adhérent (<code>capacité × taux de remplissage ÷ nombre d'adhérents</code>), et n'intervient que dans le
-              calcul de l'énergie — <code>volume facturé = volume prélevé + volume de remplissage</code> — jamais dans
-              la redevance, la part volumétrique ou le bilan agronomique. Pour toute source qui n'est pas une retenue,
-              ce volume est nul.</p>
-            <p class="fr-text--sm texte-mention">Point de vigilance non résolu à ce stade : le modèle applique ce
-              second pompage aussi bien à une retenue de pompage (remplie en pompant depuis une rivière ou une nappe)
-              qu'à une retenue collinaire (remplie par ruissellement et pluviométrie, sans pompage de remplissage). Pour
-              une retenue collinaire, ce volume de remplissage ne devrait normalement pas être facturé en énergie.</p>
-          </div>
-        </section>
+      <h3 class="fr-h5 fr-mt-5w">3. Annualisation des investissements</h3>
+      <p>Chaque investissement (CAPEX) est converti en annuité constante sur sa durée de vie :</p>
+      <p class="methode__formule"><code>Annuité = CAPEX × (1 − taux de subvention) × i(1+i)ⁿ / ((1+i)ⁿ − 1)</code></p>
+      <p class="fr-text--sm">i : taux d'actualisation (3 % par défaut) ; n : durée de vie (ans). Si i = 0, le facteur vaut 1/n.</p>
+      <p class="fr-text--bold fr-mb-1v">Limites</p>
+      <ul class="methode__limites">
+        <li>Taux d'actualisation unique, indépendant du coût réel du crédit de l'exploitant.</li>
+        <li>Coût économique lissé : ni trésorerie, ni fiscalité, ni TVA.</li>
+        <li>Pas de valeur de revente en fin de vie, ni de coût de démantèlement.</li>
+        <li>Taux de subvention par défaut indicatifs : l'aide réelle dépend du dossier et des plafonds.</li>
+      </ul>
 
-        <section class="fr-accordion">
-          <h3 class="fr-accordion__title"><button type="button" class="fr-accordion__btn" aria-expanded="false" aria-controls="an-rendement">Rendements, gains et prix de vente</button></h3>
-          <div class="fr-collapse" id="an-rendement">
-            <ul>
-              <li>Le gain est un simple différentiel de rendement (irrigué − pluvial) multiplié par un prix de vente fixe : il ne capture ni la variabilité climatique interannuelle, ni le risque d'aléas (grêle, maladies favorisées par l'irrigation), ni les effets qualité (calibre, teneur en sucre ou en protéines) que l'irrigation améliore souvent au-delà du seul tonnage.</li>
-              <li>Pour les cultures marquées « irrigation condition d'existence » (agrumes, tomates industrielles, pomme, abricot…), le rendement pluvial retenu est arbitraire ou nul : le « gain » calculé et le seuil de rentabilité associé n'ont alors pas de sens agronomique, puisque ne pas irriguer ces cultures n'est pas une option réelle.</li>
-              <li>Le prix de vente est fixe et non affecté par le volume produit, ni par la contractualisation (filière industrielle, cahier des charges d'appellation) : la volatilité interannuelle des prix, qui peut inverser un bilan d'une campagne à l'autre, n'est pas représentée.</li>
-              <li>Le calcul raisonne culture par culture et hectare par hectare : il ne représente pas les effets de système que permet l'irrigation (sécurisation d'un assolement plus rémunérateur, diversification, accès à des contrats industriels exigeant une régularité de livraison).</li>
-              <li>Aucune valorisation du risque évité par l'irrigation (assurance récolte moins coûteuse, accès facilité au crédit, sécurisation du revenu et de la trésorerie de l'exploitation).</li>
+      <h3 class="fr-h5 fr-mt-5w">4. Coûts annuels, poste par poste</h3>
+      <div class="fr-grid-row fr-grid-row--gutters">
+        <div class="fr-col-12 fr-col-md-6">
+          <div class="methode__carte">
+            <h4 class="fr-h6"><span class="pastille" style="background:{{ postes[2][2] }}"></span>Équipement</h4>
+            <p class="methode__formule"><code>Coût = annuité du CAPEX + maintenance (€/ha/an) × surface</code></p>
+            <p class="fr-text--sm">Enrouleur, pivot et rampe : CAPEX = nombre de machines × prix neuf (Chambres d'agriculture France, 2025), le nombre étant arrondi à l'unité supérieure selon la surface couverte par machine (enrouleur 20 ha, pivot 33 ha, rampe 35 ha). Autres équipements : CAPEX à l'hectare × surface.</p>
+            <p class="fr-text--bold fr-mb-1v">Limites</p>
+            <ul class="methode__limites">
+              <li>Matériel neuf, dimensionné pour la seule surface saisie.</li>
+              <li>Surface par enrouleur variable selon le besoin (20 à 25 ha).</li>
+              <li>Mutualisation (CUMA, entraide) non modélisée : pointes de besoin simultanées.</li>
+              <li>Durées de vie et maintenance issues de sources hétérogènes (2015-2025).</li>
             </ul>
           </div>
-        </section>
-
-        <section class="fr-accordion">
-          <h3 class="fr-accordion__title"><button type="button" class="fr-accordion__btn" aria-expanded="false" aria-controls="an-equipement">Équipement d'irrigation et mutualisation</button></h3>
-          <div class="fr-collapse" id="an-equipement">
-            <ul>
-              <li>Le CAPEX est calculé pour un équipement neuf, dimensionné strictement pour la surface saisie (nombre d'unités arrondi au supérieur) : aucune mutualisation entre exploitations n'est représentée par défaut — c'est l'objet de l'option « matériel déjà amorti », qui permet de simuler un équipement existant, mais sans modéliser l'acquisition mutualisée elle-même.</li>
-              <li><strong>Élément de réflexion — limites de la mutualisation :</strong> partager un enrouleur ou une rampe (CUMA, entraide, prestation de service) peut réduire le CAPEX à l'hectare, mais le modèle ne représente pas les contraintes que cela introduit : tous les adhérents ont typiquement le même besoin en eau au même moment (pointe de juillet-août), ce qui limite la capacité réelle de partage ; le matériel mobile demande du temps de transport et de manutention entre parcelles ; sa disponibilité au moment critique n'est pas garantie ; la coordination (tours d'eau, planning) a un coût d'organisation ; et la responsabilité de l'entretien peut se diluer entre utilisateurs. Diviser simplement le CAPEX par le nombre d'exploitations surestime donc probablement le gain réel de la mutualisation.</li>
-              <li>Les durées de vie et coûts de maintenance proviennent de sources hétérogènes (2013 à 2025) avec des écarts parfois importants d'une source à l'autre (par exemple la durée d'amortissement d'un pivot va de 10 à 25 ans selon la référence) : la valeur retenue dans le référentiel est une convention, pas une mesure de terrain propre à chaque exploitation.</li>
-              <li>Aucune valeur résiduelle de revente en fin de vie, ni coût de démantèlement ou de dépose, ne sont comptés.</li>
-              <li>Le coût de main-d'œuvre retenu (pose, dépose, campagne) ne couvre pas le temps de pilotage de l'irrigation (décision d'irriguer, surveillance, gestion des tours d'eau), qui peut être significatif, notamment en goutte-à-goutte ou en gestion collective.</li>
+        </div>
+        <div class="fr-col-12 fr-col-md-6">
+          <div class="methode__carte">
+            <h4 class="fr-h6"><span class="pastille" style="background:{{ postes[3][2] }}"></span>Main-d'œuvre</h4>
+            <p class="methode__formule"><code>Coût = main-d'œuvre de l'équipement (€/ha/an) × surface</code></p>
+            <p class="fr-text--sm">Pose, dépose et suivi de campagne propres à chaque équipement.</p>
+            <p class="fr-text--bold fr-mb-1v">Limites</p>
+            <ul class="methode__limites">
+              <li>Temps de pilotage (décision, surveillance, tours d'eau) non compté.</li>
+              <li>Déplacements des enrouleurs (≈ 1 h par changement de position) non comptés.</li>
+              <li>Forfait à l'hectare (Arvalis, 2018), identique quelle que soit la taille de la parcelle.</li>
             </ul>
           </div>
-        </section>
-
-        <section class="fr-accordion">
-          <h3 class="fr-accordion__title"><button type="button" class="fr-accordion__btn" aria-expanded="false" aria-controls="an-acces">Accès à la ressource et aléas</button></h3>
-          <div class="fr-collapse" id="an-acces">
-            <ul>
-              <li>L'entretien courant d'un ouvrage (curage, géomembrane, vannes, digues) n'est plus compté dans le calcul : le coût affiché sous-estime donc le coût réel de possession d'une retenue ou d'un forage sur toute sa durée de vie.</li>
-              <li>Le coût de stockage (€/m³) et le coût de forage sont des valeurs moyennes ou issues de dires d'expert : ils ne reflètent pas la topographie du site (volume de terrassement), la nature du sol (nécessité ou non d'une géomembrane), la profondeur réelle de la nappe, ni la difficulté d'accès du chantier — l'écart avec un devis réel peut être important, à la hausse comme à la baisse.</li>
-              <li>Le modèle suppose un accès sécurisé à 100 % du volume nécessaire chaque année. Il ne représente ni le risque de restriction de prélèvement en période de sécheresse (arrêtés-cadre), ni le risque hydrologique de non-remplissage d'une retenue (le taux de remplissage de 85 % est une moyenne, pas une probabilité d'occurrence annuelle garantie), ni un volume prélevable plafonné par un plan de gestion de la ressource en eau ou une autorisation administrative.</li>
-              <li>Le foncier nécessaire à l'implantation d'un ouvrage (emprise, acquisition ou location, indemnisation) n'est pas valorisé, alors qu'il peut être un facteur bloquant du projet — de même que les délais d'instruction administrative (déclaration ou autorisation loi sur l'eau), qui peuvent s'étendre sur plusieurs années et ne sont traduits par aucun coût d'opportunité dans le modèle.</li>
-              <li>Les impacts environnementaux (milieux aquatiques, continuité écologique, usages à l'aval) et un éventuel coût de mesures compensatoires ne sont pas intégrés au coût du projet.</li>
+        </div>
+        <div class="fr-col-12 fr-col-md-6">
+          <div class="methode__carte">
+            <h4 class="fr-h6"><span class="pastille" style="background:{{ postes[4][2] }}"></span>Accès à la ressource</h4>
+            <p class="methode__formule"><code>Coût = annuité (ouvrage + réseau d'amenée) + part fixe × surface + part volumétrique × volume prélevé + frais supplémentaires</code></p>
+            <p class="fr-text--sm">Retenue : capacité = volume prélevé × nombre d'adhérents ÷ taux de remplissage, coût réparti entre adhérents. Forage : étude + raccordement électrique + foration × profondeur + pompe et abri.</p>
+            <p class="fr-text--bold fr-mb-1v">Limites</p>
+            <ul class="methode__limites">
+              <li>Coûts moyens, sans prise en compte du site (terrassement, géomembrane, profondeur de nappe).</li>
+              <li>Entretien courant de l'ouvrage non compté.</li>
+              <li>Volume supposé disponible chaque année (pas de risque de non-remplissage).</li>
+              <li>Foncier, délais d'autorisation et impacts environnementaux non valorisés.</li>
             </ul>
           </div>
-        </section>
-
-        <section class="fr-accordion">
-          <h3 class="fr-accordion__title"><button type="button" class="fr-accordion__btn" aria-expanded="false" aria-controls="an-financement">Financement et subventions</button></h3>
-          <div class="fr-collapse" id="an-financement">
-            <ul>
-              <li>Les taux de subvention par défaut (70 % pour les retenues, 45 % pour un forage, 0 % pour le matériel d'irrigation) sont des hypothèses de travail, pas des droits acquis : l'aide réelle dépend d'un dossier individuel, d'un zonage, de plafonds souvent exprimés en valeur absolue (ce qui pénalise proportionnellement les gros projets), et de l'enveloppe disponible au moment de la demande (guichets Agence de l'eau, Région, FranceAgriMer, Europe, PCAE pour le matériel).</li>
-              <li>Un taux d'actualisation générique (3 % par défaut) est utilisé pour tous les projets et tous les exploitants : il ne reflète pas le coût réel du crédit (taux d'emprunt négocié, apport personnel, capacité d'autofinancement) propre à chaque situation.</li>
-              <li>Aucun effet de trésorerie n'est modélisé (échéancier de remboursement, TVA, amortissement comptable, fiscalité IS/IR) : le calcul raisonne en coût économique annualisé et lissé, pas en flux de trésorerie réels perçus par l'exploitant année par année.</li>
-              <li>Le coût d'opportunité du temps d'instruction du dossier (subvention et autorisation administrative), parfois plusieurs années, n'est pas valorisé alors qu'il retarde d'autant le retour sur investissement.</li>
+        </div>
+        <div class="fr-col-12 fr-col-md-6">
+          <div class="methode__carte">
+            <h4 class="fr-h6"><span class="pastille" style="background:{{ postes[0][2] }}"></span>Énergie</h4>
+            <p class="methode__formule"><code>Coût = (volume prélevé + volume de remplissage d'une retenue) × prix forfaitaire (€/m³)</code></p>
+            <p class="fr-text--sm">Prix forfaitaire de 0,07 €/m³ (CGEDD, 2020). Nul si l'eau est livrée sous pression (réseau, ASA) : l'énergie est alors comprise dans la part volumétrique.</p>
+            <p class="fr-text--bold fr-mb-1v">Limites</p>
+            <ul class="methode__limites">
+              <li>Prix identique quelle que soit la hauteur de pompage (forage profond ou pompage de surface).</li>
+              <li>Tarifs réels (heures creuses, photovoltaïque) et hausse depuis 2020 non pris en compte.</li>
+              <li>Remplissage compté aussi pour une retenue collinaire, alimentée sans pompage.</li>
             </ul>
           </div>
-        </section>
-
-        <section class="fr-accordion">
-          <h3 class="fr-accordion__title"><button type="button" class="fr-accordion__btn" aria-expanded="false" aria-controls="an-energie">Énergie</button></h3>
-          <div class="fr-collapse" id="an-energie">
-            <ul>
-              <li>Le coût de l'énergie de pompage est volontairement un prix forfaitaire unique (7 c€/m³, CGEDD 2020), identique pour tous les équipements et toutes les sources d'eau (hors eau livrée sous pression) : un pompage de surface à faible hauteur et un relevage de forage profond sont facturés au même tarif forfaitaire, alors que leur consommation réelle d'énergie diffère fortement selon la hauteur de pompage. Cette hauteur n'est pas modélisée.</li>
-              <li>Ce prix forfaitaire ne reflète pas les offres tarifaires réelles (heures creuses agricoles, autoconsommation photovoltaïque, contrats individuels), ni son évolution depuis 2020.</li>
+        </div>
+        <div class="fr-col-12 fr-col-md-6">
+          <div class="methode__carte">
+            <h4 class="fr-h6"><span class="pastille" style="background:{{ postes[1][2] }}"></span>Redevance agence de l'eau</h4>
+            <p class="methode__formule"><code>Coût = volume prélevé × taux (c€/m³) ÷ 100</code></p>
+            <p class="fr-text--sm">Taux de l'agence selon la catégorie (1 hors ZRE, 2 en ZRE) et l'origine de l'eau (souterraine pour un forage, superficielle sinon). Due si le volume dépasse le seuil d'assujettissement ou si l'accès est collectif.</p>
+            <p class="fr-text--bold fr-mb-1v">Limites</p>
+            <ul class="methode__limites">
+              <li>Agence déduite du département, pas du bassin versant exact.</li>
+              <li>Taux 2025 du 12<sup>e</sup> programme, révisables chaque année.</li>
+              <li>Cas particuliers (retenues, prélèvements mixtes) simplifiés.</li>
             </ul>
           </div>
-        </section>
-
-        <section class="fr-accordion">
-          <h3 class="fr-accordion__title"><button type="button" class="fr-accordion__btn" aria-expanded="false" aria-controls="an-portee">Portée générale du modèle</button></h3>
-          <div class="fr-collapse" id="an-portee">
-            <ul>
-              <li>C'est un modèle statique annuel : un seul jeu d'hypothèses moyennes est simulé à la fois, sans distribution de probabilité ni analyse de sensibilité automatisée. Faire varier les paramètres (prix, subvention, rendement) pour tester des scénarios reste à la charge de l'utilisateur.</li>
-              <li>Les valeurs par défaut proviennent de sources hétérogènes en date et en méthode (barèmes professionnels, témoignages d'experts, guides techniques, rapports scientifiques) : le niveau de fiabilité affiché (documenté, calculé, estimé) indique l'origine de chaque valeur, mais la précision réelle reste très variable d'un paramètre à l'autre.</li>
-              <li>Le modèle raisonne à l'échelle d'un projet individuel : il n'évalue pas les effets cumulés à l'échelle d'un bassin versant (multiplication des prélèvements, conflits d'usage, impact cumulé sur le débit des cours d'eau et les milieux).</li>
-              <li>Aucune actualisation automatique des prix (inflation, coût des matériaux, prix de l'énergie) au-delà de la date des sources citées dans l'onglet Références.</li>
-            </ul>
-          </div>
-        </section>
-
+        </div>
       </div>
+
+      <h3 class="fr-h5 fr-mt-5w">5. Seuil de rentabilité</h3>
+      <p class="methode__formule"><code>Prix de vente minimal (€/t) = coût total ÷ ((rendement irrigué − rendement pluvial) × 0,1 × surface)</code></p>
+      <p class="fr-text--bold fr-mb-1v">Limites</p>
+      <ul class="methode__limites">
+        <li>Modèle statique annuel : un seul jeu d'hypothèses moyennes, sans analyse de sensibilité automatique.</li>
+        <li>Échelle du projet individuel : les effets cumulés à l'échelle du bassin versant ne sont pas évalués.</li>
+        <li>Prix non actualisés au-delà de la date des sources (onglet Références).</li>
+      </ul>
     </div>
 
     {# ===================================================================== #}

@@ -480,7 +480,7 @@
     texte("agro-rdt-irr-tt", bulles.rdt_irrigue || "");
     texte("agro-rdt-plu-tt", bulles.rdt_pluvial || "");
     texte("agro-besoin-tt", bulles.besoin_mm || "");
-    texte("agro-volume-tt", "Besoin (mm) × 10 × surface ÷ efficience d'application du matériel · Calculé [C]");
+    texte("agro-volume-tt", "Besoin (mm) × 10 × surface ÷ efficience d'application du matériel");
 
     var notes = a.notes || [];
     html("notes-agro", notes.length
@@ -497,7 +497,7 @@
     texte("eco-gain", fmt(res.gain.total, 0));
     texte("eco-gain-cpl", fmt(res.gain.par_ha, 0) + " €/ha · " + fmtS(a.delta_rdt) + " q/ha × " +
       fmtS(res.gain.prix) + " €/t");
-    texte("eco-gain-tt", "(rendement irrigué − rendement pluvial) × 0,1 × prix de vente × surface · Calculé [C]");
+    texte("eco-gain-tt", "(rendement irrigué − rendement pluvial) × 0,1 × prix de vente × surface");
     texte("eco-capex", fmt(res.capex.total, 0));
     var complementCapex;
     if (res.capex.deja_amorti && res.capex.deja_amorti_equipement) {
@@ -513,7 +513,7 @@
     }
     texte("eco-capex-cpl", complementCapex);
     texte("eco-capex-tt", "Matériel d'irrigation (" + euros(res.capex.equipement, 0) + ") + accès à la ressource (" +
-      euros(res.capex.acces_brut, 0) + "), avant subvention · Calculé [C]");
+      euros(res.capex.acces_brut, 0) + "), avant subvention");
 
     /* --- Décomposition */
     c.postes.forEach(function (p) {

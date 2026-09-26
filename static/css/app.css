@@ -135,3 +135,17 @@
   .bloc-graphique__cadre { height: 18rem; border: 0; }
   .indicateur { border: 1px solid #000; }
 }
+
+/* ------------------------------------------------- Onglet Méthode */
+.methode { max-width: 64rem; }
+.methode__formule { margin-bottom: .75rem; }
+.methode__formule code {
+  display: inline-block; padding: .375rem .625rem; white-space: normal;
+  background: var(--background-alt-blue-france); color: var(--text-default-grey); font-size: .875rem;
+}
+.methode__limites li { font-size: .875rem; }
+.methode__carte {
+  height: 100%; padding: 1rem 1.25rem .25rem;
+  border: 1px solid var(--border-default-grey); background: var(--background-default-grey);
+}
+.methode__carte h4 { display: flex; align-items: center; }

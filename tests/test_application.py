@@ -133,17 +133,18 @@ class TestMoteur(unittest.TestCase):
 
     def test_effet_de_seuil_des_machines(self):
         """Le CAPEX du matériel unitaire progresse par paliers, pas linéairement."""
+        s = REF.valeur("Equipement", "Pivot", "surface_unitaire")
         capex = {}
-        for surface in (29.0, 30.0, 31.0, 60.0, 61.0):
+        for surface in (s - 1, s, s + 1, 2 * s, 2 * s + 1):
             r = simuler(REF, entrees(surface=surface, equipement="Pivot"), {}, AGRO)
             capex[surface] = (r["dimensionnement"]["nb_unites"], r["capex"]["equipement"])
-        self.assertEqual(capex[29.0][0], 1)
-        self.assertEqual(capex[30.0][0], 1)
-        self.assertEqual(capex[31.0][0], 2)
-        self.assertEqual(capex[60.0][0], 2)
-        self.assertEqual(capex[61.0][0], 3)
-        self.assertEqual(capex[29.0][1], capex[30.0][1])
-        self.assertAlmostEqual(capex[31.0][1], 2 * capex[30.0][1])
+        self.assertEqual(capex[s - 1][0], 1)
+        self.assertEqual(capex[s][0], 1)
+        self.assertEqual(capex[s + 1][0], 2)
+        self.assertEqual(capex[2 * s][0], 2)
+        self.assertEqual(capex[2 * s + 1][0], 3)
+        self.assertEqual(capex[s - 1][1], capex[s][1])
+        self.assertAlmostEqual(capex[s + 1][1], 2 * capex[s][1])
 
     def test_maintenance_equipement_unite_coherente(self):
         """La maintenance ne doit pas mélanger un taux en €/ha/an avec un pourcentage du CAPEX total.

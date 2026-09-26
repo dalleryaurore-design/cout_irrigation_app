@@ -246,7 +246,7 @@ def _valeurs_agro(ref, e, commune):
                     f"Méthode SGPE : Σ max(0, ETP × Kc − P) sur les mois où Kc > 0 · Kc "
                     f"{r_fao.citation if r_fao else '(FAO)'} ; ETP et P {r_drias.citation if r_drias else '(DRIAS)'}, "
                     f"RCP4.5, {dt['libelle_horizon']}, point de grille {dt['point']} à {dt['distance_km']:.1f} km "
-                    "du centre de la commune · Calculé [C]")
+                    "du centre de la commune")
                 agro["sgpe"] = dt
                 agro["methode_besoin"] = "sgpe"
             else:
