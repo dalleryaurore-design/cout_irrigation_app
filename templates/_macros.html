@@ -1,0 +1,57 @@
+{# Info-bulle DSFR (composant fr-tooltip) #}
+{% macro infobulle(id, texte) -%}
+<span class="fr-tooltip fr-placement" id="{{ id }}" role="tooltip" aria-hidden="true">{{ texte }}</span>
+{%- endmacro %}
+
+{# Valeur d'un paramètre : champ modifiable si « Variable = oui », texte sourcé sinon.
+   p : Param ; prefixe : pour garantir l'unicité des identifiants ; suffixe : unité affichée #}
+{% macro valeur(p, prefixe='v', suffixe='') -%}
+{%- if p is none -%}<span class="fr-text--xs texte-mention">–</span>
+{%- else -%}
+{%- set idt = prefixe ~ '-tt-' ~ p.id_html -%}
+{%- set texte = ref.infobulle(p) -%}
+{%- if p.variable -%}
+  {%- if p.est_pourcentage -%}
+    {%- set v = (p.valeur * 100) | round(2) -%}{%- set pas = 0.5 -%}
+    {%- set vmin = (p.vmin * 100) | brut if p.vmin is not none else '' -%}{%- set vmax = (p.vmax * 100) | brut if p.vmax is not none else '' -%}
+  {%- else -%}
+    {%- set v = p.valeur -%}
+    {%- set pas = 0.001 if (p.valeur is not none and p.valeur < 1 and p.valeur % 1) else (0.01 if (p.valeur is not none and p.valeur < 10 and p.valeur % 1) else (0.5 if (p.valeur is not none and p.valeur % 1) else 1)) -%}
+    {%- set vmin = p.vmin | brut if p.vmin is not none else '' -%}{%- set vmax = p.vmax | brut if p.vmax is not none else '' -%}
+  {%- endif -%}
+<span class="champ-cellule">
+  <input class="fr-input champ-param" type="number" inputmode="decimal" id="{{ prefixe }}-in-{{ p.id_html }}"
+         data-cle="{{ p.cle }}" data-pct="{{ 1 if p.est_pourcentage else 0 }}" data-defaut="{{ v | brut }}"
+         value="{{ v | brut }}" step="{{ pas }}" {% if vmin != '' %}min="{{ vmin }}"{% endif %} {% if vmax != '' %}max="{{ vmax }}"{% endif %}
+         aria-label="{{ p.objet }} – {{ p.libelle }} ({{ p.unite }})" aria-describedby="{{ idt }}">
+  {%- if suffixe %}<span class="champ-suffixe">{{ suffixe }}</span>{% endif -%}
+  {{ infobulle(idt, texte) }}
+</span>
+{%- else -%}
+<span class="valeur-sourcee" tabindex="0" aria-describedby="{{ idt }}">{{ p | valeur_param }}{% if suffixe %} {{ suffixe }}{% endif %}</span>{{ infobulle(idt, texte) }}
+{%- endif -%}
+{%- endif -%}
+{%- endmacro %}
+
+{# Cellule calculée (mise à jour par l'API) #}
+{% macro derivee(id, valeur, format='euro', texte='Valeur calculée à partir des paramètres ci-contre') -%}
+<span class="valeur-sourcee valeur-calculee" tabindex="0" id="{{ id }}" data-format="{{ format }}" aria-describedby="{{ id }}-tt">
+{%- if format == 'pct' -%}{{ (valeur * 100) | nombre(2) }} %{%- elif format == 'kwh' -%}{{ valeur | nombre(3) }}{%- elif format == 'eurom3' -%}{{ valeur | nombre(3) }}{%- else -%}{{ valeur | nombre(0) }}{%- endif -%}
+</span>{{ infobulle(id ~ '-tt', texte) }}
+{%- endmacro %}
+
+{# Tableau DSFR, avec bouton d'export CSV (id = 2e argument, ou dérivé de la légende) #}
+{% macro table_debut(legende, id='') -%}
+{%- set tid = id if id else (legende | slug) -%}
+<div class="fr-table fr-table--sm fr-table--no-caption">
+  <div class="tableau-barre-outils">
+    <button type="button" class="fr-btn fr-btn--tertiary-no-outline fr-btn--sm fr-icon-download-line fr-btn--icon-left bouton-export-tableau" data-cible="{{ tid }}" title="Exporter « {{ legende }} » au format CSV">Exporter (CSV)</button>
+  </div>
+  <div class="fr-table__wrapper"><div class="fr-table__container"><div class="fr-table__content">
+  <table id="{{ tid }}"><caption>{{ legende }}</caption>
+{%- endmacro %}
+{% macro table_fin() -%}
+  </table>
+  </div></div></div>
+</div>
+{%- endmacro %}

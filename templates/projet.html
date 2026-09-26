@@ -1,0 +1,714 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block titre %}Projet – {{ TITRE }}{% endblock %}
+{% block css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/leaflet/leaflet.css') }}">
+{% endblock %}
+
+{% block contenu %}
+<div class="fr-container fr-mt-4w">
+  <div class="fr-grid-row fr-grid-row--middle fr-mb-2w">
+    <div class="fr-col">
+      <h1 class="fr-h2 fr-mb-1w">Projet d'irrigation</h1>
+      <p class="fr-text--lead fr-mb-0">Décrivez la situation : le coût annuel, le gain de rendement et le seuil de rentabilité se mettent à jour à chaque modification.</p>
+    </div>
+    <div class="fr-col-auto">
+      <ul class="fr-btns-group fr-btns-group--inline-md fr-btns-group--sm fr-btns-group--icon-left">
+        <li><button class="fr-btn fr-btn--tertiary fr-icon-refresh-line" id="reinitialiser" type="button">Rétablir les valeurs du référentiel</button></li>
+      </ul>
+    </div>
+  </div>
+
+  {% if exemple %}
+  <div class="fr-notice fr-notice--info fr-mb-3w" id="bandeau-exemple">
+    <div class="fr-container"><div class="fr-notice__body">
+      <p><span class="fr-notice__title">Exemple {{ exemple.id }} – {{ exemple.titre }}.</span>
+         <span class="fr-notice__desc">{{ exemple.enjeu }}</span></p>
+      <button class="fr-btn--close fr-btn" title="Masquer le message" onclick="this.closest('.fr-notice').remove()">Masquer le message</button>
+    </div></div>
+  </div>
+  {% endif %}
+
+  <div class="fr-tabs" id="onglets-projet">
+    <ul class="fr-tabs__list" role="tablist" aria-label="Volets du projet">
+      <li role="presentation"><button id="tab-simulation" class="fr-tabs__tab fr-icon-calculator-line fr-tabs__tab--icon-left" tabindex="0" role="tab" aria-selected="true" aria-controls="panel-simulation">Simulation</button></li>
+      <li role="presentation"><button id="tab-equipement" class="fr-tabs__tab fr-icon-settings-5-line fr-tabs__tab--icon-left" tabindex="-1" role="tab" aria-selected="false" aria-controls="panel-equipement">Équipement</button></li>
+      <li role="presentation"><button id="tab-acces" class="fr-tabs__tab fr-icon-drop-line fr-tabs__tab--icon-left" tabindex="-1" role="tab" aria-selected="false" aria-controls="panel-acces">Accès à la ressource en eau</button></li>
+      <li role="presentation"><button id="tab-ressources" class="fr-tabs__tab fr-icon-money-euro-circle-line fr-tabs__tab--icon-left" tabindex="-1" role="tab" aria-selected="false" aria-controls="panel-ressources">Ressources</button></li>
+      <li role="presentation"><button id="tab-analyse" class="fr-tabs__tab fr-icon-lightbulb-line fr-tabs__tab--icon-left" tabindex="-1" role="tab" aria-selected="false" aria-controls="panel-analyse">Analyse</button></li>
+    </ul>
+
+    {# ===================================================================== #}
+    {#                              SIMULATION                               #}
+    {# ===================================================================== #}
+    <div id="panel-simulation" class="fr-tabs__panel fr-tabs__panel--selected" role="tabpanel" aria-labelledby="tab-simulation" tabindex="0">
+      <div class="fr-grid-row fr-grid-row--gutters">
+        <div class="fr-col-12 fr-col-lg-6">
+          <form id="formulaire" class="formulaire-projet" novalidate onsubmit="return false">
+
+            <fieldset class="fr-fieldset" aria-labelledby="leg-localisation">
+              <legend class="fr-fieldset__legend" id="leg-localisation">Localisation</legend>
+              <div class="fr-fieldset__element">
+                <div class="fr-input-group recherche-commune">
+                  <label class="fr-label" for="commune-recherche">Commune</label>
+                  <div class="fr-search-bar" role="search">
+                    <input class="fr-input" type="search" id="commune-recherche" autocomplete="off"
+                           placeholder="Ex. Benquet, 40280" role="combobox" aria-autocomplete="list"
+                           aria-expanded="false" aria-controls="commune-suggestions">
+                    <button class="fr-btn" type="button" id="commune-bouton" title="Rechercher la commune">Rechercher</button>
+                  </div>
+                  <ul class="suggestions" id="commune-suggestions" role="listbox" hidden></ul>
+                  <p class="fr-message fr-mt-1w" id="commune-etat" aria-live="polite"></p>
+                </div>
+              </div>
+              <div class="fr-fieldset__element fr-fieldset__element--inline-grow">
+                <div class="fr-select-group">
+                  <label class="fr-label" for="agence">Agence de l'eau</label>
+                  <select class="fr-select" id="agence">
+                    <option value="">– Aucune (pas de redevance calculée) –</option>
+                    {% for a in ref.agences %}<option value="{{ a }}" {% if loop.first %}selected{% endif %}>{{ a }}</option>{% endfor %}
+                  </select>
+                </div>
+              </div>
+              <div class="fr-fieldset__element">
+                <div class="fr-checkbox-group fr-checkbox-group--sm">
+                  <input type="checkbox" id="zre">
+                  <label class="fr-label" for="zre">Commune située en zone de répartition des eaux (ZRE)
+                    <span class="fr-hint-text">Catégorie 2 de redevance. Le classement est fixé par arrêté préfectoral.</span></label>
+                </div>
+              </div>
+            </fieldset>
+
+            <fieldset class="fr-fieldset" aria-labelledby="leg-culture">
+              <legend class="fr-fieldset__legend" id="leg-culture">Culture</legend>
+              <div class="fr-fieldset__element">
+                <div class="fr-select-group">
+                  <label class="fr-label" for="culture">Culture irriguée</label>
+                  <select class="fr-select" id="culture">
+                    {% for c in ref.cultures %}<option value="{{ c }}" {% if c == CULTURE_DEFAUT %}selected{% endif %}>{{ c }}{% if c in catalogue and catalogue[c].complet %} · cartes disponibles{% endif %}</option>{% endfor %}
+                  </select>
+                </div>
+              </div>
+              <div class="fr-fieldset__element">
+                <div class="fr-input-group">
+                  <label class="fr-label" for="prix-vente">Prix de vente de la culture (€/t)</label>
+                  <div class="champ-avec-action">
+                    <input class="fr-input" type="number" id="prix-vente" min="0" step="1" inputmode="decimal">
+                    <button type="button" class="fr-btn fr-btn--tertiary-no-outline fr-btn--sm fr-icon-arrow-go-back-line fr-btn--icon-left" id="prix-retablir">Valeur par défaut</button>
+                  </div>
+                </div>
+              </div>
+              <div class="fr-fieldset__element">
+                <div class="fr-checkbox-group fr-checkbox-group--sm">
+                  <input type="checkbox" id="sans-carte">
+                  <label class="fr-label" for="sans-carte">Utiliser les rendements par défaut du référentiel (sans carte)
+                    <span class="fr-hint-text" id="etat-cartes"></span></label>
+                </div>
+                {% if cartes_presentes and not lecture_cartes %}
+                <p class="fr-message fr-message--warning fr-mt-1w">Des cartes sont présentes mais ne peuvent pas être
+                  lues{% if erreur_rasterio %} ({{ erreur_rasterio }}){% endif %} : les valeurs du référentiel sont
+                  utilisées.</p>
+                {% elif lecture_cartes %}
+                <p class="fr-message fr-mt-1w"><a class="fr-link fr-link--sm" href="{{ url_for('references') }}#cartes">Hypothèses
+                  des cartes : scénario RCP4.5 et narratif « violet » d'Explore2</a></p>
+                {% endif %}
+              </div>
+              <div class="fr-fieldset__element">
+                <div class="fr-input-group">
+                  <label class="fr-label" for="surface">Surface irriguée (ha)
+                    <span class="fr-hint-text">Hypothèse : surface irriguée = surface équipée d'irrigation.</span></label>
+                  <input class="fr-input" type="number" id="surface" min="0.1" step="0.5" value="30" inputmode="decimal">
+                </div>
+              </div>
+            </fieldset>
+
+            <fieldset class="fr-fieldset" aria-labelledby="leg-source">
+              <legend class="fr-fieldset__legend" id="leg-source">Ressource en eau</legend>
+              <div class="fr-fieldset__element">
+                <div class="fr-select-group">
+                  <label class="fr-label" for="source">Source de l'eau</label>
+                  <select class="fr-select" id="source">
+                    {% for s in ref.sources %}<option value="{{ s }}" data-type="{{ type_source(s) }}">{{ s }}</option>{% endfor %}
+                  </select>
+                </div>
+              </div>
+              <div class="bloc-conditionnel" id="bloc-retenue" hidden>
+                <div class="fr-fieldset__element">
+                  <fieldset class="fr-fieldset fr-fieldset--inline" aria-labelledby="leg-type-retenue">
+                    <legend class="fr-fieldset__legend--regular fr-fieldset__legend" id="leg-type-retenue">Gestion de la retenue</legend>
+                    <div class="fr-fieldset__element fr-fieldset__element--inline">
+                      <div class="fr-radio-group fr-radio-group--sm">
+                        <input type="radio" id="retenue-individuelle" name="type-retenue" value="individuelle" checked>
+                        <label class="fr-label" for="retenue-individuelle">Individuelle</label>
+                      </div>
+                    </div>
+                    <div class="fr-fieldset__element fr-fieldset__element--inline">
+                      <div class="fr-radio-group fr-radio-group--sm">
+                        <input type="radio" id="retenue-collective" name="type-retenue" value="collective">
+                        <label class="fr-label" for="retenue-collective">Collective</label>
+                      </div>
+                    </div>
+                  </fieldset>
+                </div>
+                <div class="fr-fieldset__element" id="bloc-adherents" hidden>
+                  <div class="fr-input-group">
+                    <label class="fr-label" for="nb-adherents">Nombre d'adhérents
+                      <span class="fr-hint-text">Le coût de l'ouvrage est réparti à parts égales.</span></label>
+                    <input class="fr-input" type="number" id="nb-adherents" min="2" step="1" value="10">
+                  </div>
+                </div>
+                <div class="fr-fieldset__element">
+                  <div class="fr-toggle fr-toggle--label-left">
+                    <input type="checkbox" class="fr-toggle__input" id="capacite-auto" checked aria-describedby="capacite-auto-aide">
+                    <label class="fr-toggle__label" for="capacite-auto">Dimensionner la capacité sur le besoin</label>
+                    <p class="fr-hint-text" id="capacite-auto-aide">Capacité = volume à prélever ÷ taux de remplissage (× adhérents si collective).</p>
+                  </div>
+                </div>
+                <div class="fr-fieldset__element fr-fieldset__element--inline-grow">
+                  <div class="fr-input-group">
+                    <label class="fr-label" for="capacite">Capacité de stockage (m³)</label>
+                    <input class="fr-input" type="number" id="capacite" min="0" step="1000" disabled>
+                  </div>
+                </div>
+                <div class="fr-fieldset__element fr-fieldset__element--inline-grow">
+                  <div class="fr-input-group">
+                    <label class="fr-label" for="remplissage">Taux de remplissage (%)</label>
+                    <input class="fr-input champ-param" type="number" id="remplissage" data-cle="Acces_ressource|Général|taux_remplissage" data-pct="1" min="0" max="100" step="1" value="85">
+                  </div>
+                </div>
+                <div class="fr-fieldset__element">
+                  <div class="fr-accordions-group">
+                    <section class="fr-accordion">
+                      <h4 class="fr-accordion__title"><button type="button" class="fr-accordion__btn" aria-expanded="false" aria-controls="acc-duree-vie-bassine">Modifier la durée d'amortissement de <span id="duree-vie-bassine-nom">la retenue</span></button></h4>
+                      <div class="fr-collapse" id="acc-duree-vie-bassine">
+                        <div class="fr-input-group">
+                          <label class="fr-label" for="duree-vie-bassine-sim">Durée de vie (amortissement) (ans)
+                            <span class="fr-hint-text" id="duree-vie-bassine-sim-aide"></span></label>
+                          <input class="fr-input" type="number" id="duree-vie-bassine-sim" min="1" max="80" step="1" inputmode="numeric" aria-describedby="duree-vie-bassine-sim-aide">
+                        </div>
+                      </div>
+                    </section>
+                  </div>
+                </div>
+              </div>
+              <div class="fr-fieldset__element">
+                <div class="fr-checkbox-group fr-checkbox-group--sm">
+                  <input type="checkbox" id="deja-amorti">
+                  <label class="fr-label" for="deja-amorti">Infrastructure d'accès existante, déjà amortie</label>
+                </div>
+              </div>
+            </fieldset>
+
+            <fieldset class="fr-fieldset" aria-labelledby="leg-equipement">
+              <legend class="fr-fieldset__legend" id="leg-equipement">Équipement et financement</legend>
+              <div class="fr-fieldset__element fr-fieldset__element--inline-grow">
+                <div class="fr-select-group">
+                  <label class="fr-label" for="equipement">Équipement d'irrigation</label>
+                  <select class="fr-select" id="equipement">
+                    {% for e in ref.equipements %}<option value="{{ e }}" {% if e == 'Pivot' %}selected{% endif %}>{{ e }}</option>{% endfor %}
+                  </select>
+                </div>
+              </div>
+              <div class="fr-fieldset__element fr-fieldset__element--inline-grow" id="bloc-unites" hidden>
+                <div class="fr-input-group">
+                  <label class="fr-label" for="nb-unites">Nombre d'unités</label>
+                  <input class="fr-input" type="number" id="nb-unites" min="1" step="1">
+                </div>
+              </div>
+              <div class="fr-fieldset__element">
+                <div class="fr-accordions-group">
+                  <section class="fr-accordion">
+                    <h4 class="fr-accordion__title"><button type="button" class="fr-accordion__btn" aria-expanded="false" aria-controls="acc-duree-vie-equipement">Modifier la durée d'amortissement de <span id="duree-vie-equipement-nom">Pivot</span></button></h4>
+                    <div class="fr-collapse" id="acc-duree-vie-equipement">
+                      <div class="fr-input-group">
+                        <label class="fr-label" for="duree-vie-equipement-sim">Durée de vie (amortissement) (ans)
+                          <span class="fr-hint-text" id="duree-vie-equipement-sim-aide"></span></label>
+                        <input class="fr-input" type="number" id="duree-vie-equipement-sim" min="1" max="40" step="1" inputmode="numeric" aria-describedby="duree-vie-equipement-sim-aide">
+                      </div>
+                    </div>
+                  </section>
+                </div>
+              </div>
+              <div class="fr-fieldset__element">
+                <div class="fr-checkbox-group fr-checkbox-group--sm">
+                  <input type="checkbox" id="deja-amorti-equipement">
+                  <label class="fr-label" for="deja-amorti-equipement">Matériel d'irrigation existant, déjà amorti</label>
+                </div>
+              </div>
+              <div class="fr-fieldset__element">
+                <div class="fr-range-group" id="groupe-subvention-equipement">
+                  <label class="fr-label" id="label-subvention-equipement">Subvention de l'État au matériel d'irrigation
+                    <span class="fr-hint-text">Porte sur le matériel d'irrigation (pivot, enrouleur, goutte-à-goutte…), pas sur l'accès à la ressource.</span></label>
+                  <div class="fr-range fr-range--step" data-fr-js-range="true" data-fr-suffix=" %">
+                    <span class="fr-range__output">0 %</span>
+                    <input type="range" id="subvention-equipement" class="champ-param" data-cle="Equipement|Général|taux_subvention" data-pct="1"
+                           min="0" max="100" step="5" value="0" aria-labelledby="label-subvention-equipement" aria-describedby="groupe-subvention-equipement-messages">
+                    <span class="fr-range__min" aria-hidden="true">0</span>
+                    <span class="fr-range__max" aria-hidden="true">100</span>
+                  </div>
+                  <div class="fr-messages-group" id="groupe-subvention-equipement-messages" aria-live="polite"></div>
+                </div>
+              </div>
+              <div class="fr-fieldset__element">
+                <div class="fr-range-group" id="groupe-subvention">
+                  <label class="fr-label" id="label-subvention">Subvention de l'État aux infrastructures d'accès à la ressource
+                    <span class="fr-hint-text">Porte sur l'ouvrage et le réseau d'amenée, pas sur le matériel d'irrigation.</span></label>
+                  <div class="fr-range fr-range--step" data-fr-js-range="true" data-fr-suffix=" %">
+                    <span class="fr-range__output">70 %</span>
+                    <input type="range" id="subvention" class="champ-param" data-cle="Acces_ressource|Général|taux_subvention" data-pct="1"
+                           min="0" max="100" step="5" value="70" aria-labelledby="label-subvention" aria-describedby="groupe-subvention-messages">
+                    <span class="fr-range__min" aria-hidden="true">0</span>
+                    <span class="fr-range__max" aria-hidden="true">100</span>
+                  </div>
+                  <div class="fr-messages-group" id="groupe-subvention-messages" aria-live="polite"></div>
+                </div>
+              </div>
+            </fieldset>
+          </form>
+        </div>
+
+        <div class="fr-col-12 fr-col-lg-6">
+          <div class="bloc-carte">
+            <div class="fr-checkbox-group fr-checkbox-group--sm" id="cases-cartes-variables">
+              <input type="checkbox" id="carte-var-rdt_irrigue" class="carte-var-case" data-variable="rdt_irrigue">
+              <label class="fr-label" for="carte-var-rdt_irrigue">Rendement potentiel irrigué</label>
+            </div>
+            <div class="fr-checkbox-group fr-checkbox-group--sm">
+              <input type="checkbox" id="carte-var-rdt_pluvial" class="carte-var-case" data-variable="rdt_pluvial">
+              <label class="fr-label" for="carte-var-rdt_pluvial">Rendement potentiel pluvial (non irrigué)</label>
+            </div>
+            <div class="fr-checkbox-group fr-checkbox-group--sm fr-mb-1w">
+              <input type="checkbox" id="carte-var-besoin" class="carte-var-case" data-variable="besoin">
+              <label class="fr-label" for="carte-var-besoin">Besoin en eau d'irrigation</label>
+            </div>
+            <div id="carte-simulation" class="carte carte--simulation" role="region" aria-label="Carte de localisation de la commune"></div>
+            <p class="fr-text--xs texte-mention fr-mt-1w fr-mb-0" id="carte-legende">{% if fond_carte %}Fond de carte : Plan IGN. {% endif %}Sélectionnez une commune pour la localiser.</p>
+            <div id="legendes-cartes-variables" class="legendes-cartes-variables" hidden></div>
+          </div>
+        </div>
+      </div>
+
+      {# ------------------------------ Résultats ------------------------------ #}
+      <section id="resultats" class="fr-mt-5w" aria-live="polite" aria-busy="false">
+        <h2 class="fr-h4 titre-section">Bilan agronomique</h2>
+        <div class="fr-grid-row fr-grid-row--gutters">
+          {% for id, libelle, unite in [('agro-rdt-irr', 'Rendement avec irrigation', 'q/ha'), ('agro-rdt-plu', 'Rendement sans irrigation (pluvial)', 'q/ha'), ('agro-besoin', "Besoin en eau d'irrigation", 'mm'), ('agro-volume', "Volume total d'eau d'irrigation", 'm³')] %}
+          <div class="fr-col-12 fr-col-sm-6 fr-col-lg-3">
+            <div class="indicateur">
+              <p class="indicateur__libelle">{{ libelle }}</p>
+              <p class="indicateur__valeur"><span class="valeur-sourcee" tabindex="0" id="{{ id }}" aria-describedby="{{ id }}-tt">–</span> <span class="indicateur__unite">{{ unite }}</span></p>
+              {{ m.infobulle(id ~ '-tt', '–') }}
+              <p class="indicateur__complement" id="{{ id }}-cpl"></p>
+              {% if id == 'agro-besoin' %}
+              <fieldset class="fr-fieldset fr-mt-1w fr-mb-0" id="methode-besoin" aria-labelledby="leg-methode-besoin">
+                <legend class="fr-fieldset__legend--regular fr-fieldset__legend fr-text--xs fr-pb-0" id="leg-methode-besoin">Méthode d'estimation</legend>
+                {% for val, lib in [('carte', 'Carte'), ('sgpe', 'SGPE'), ('reference', 'Référence')] %}
+                <div class="fr-fieldset__element fr-fieldset__element--inline fr-mb-0">
+                  <div class="fr-radio-group fr-radio-group--sm">
+                    <input type="radio" id="methode-besoin-{{ val }}" name="methode-besoin" value="{{ val }}" {% if loop.first %}checked{% endif %}>
+                    <label class="fr-label" for="methode-besoin-{{ val }}">{{ lib }}</label>
+                  </div>
+                </div>
+                {% endfor %}
+              </fieldset>
+              <p class="fr-hint-text fr-mb-0" id="methode-besoin-aide"></p>
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        <div id="notes-agro" class="fr-mt-2w"></div>
+
+        <h2 class="fr-h4 titre-section fr-mt-5w">Bilan économique</h2>
+        <div class="fr-grid-row fr-grid-row--gutters">
+          <div class="fr-col-12 fr-col-md-6 fr-col-lg-3">
+            <div class="indicateur indicateur--bilan" id="tuile-bilan">
+              <p class="indicateur__libelle">Bilan (gain − coût)</p>
+              <p class="indicateur__valeur"><span id="eco-bilan">–</span> <span class="indicateur__unite">€/an</span></p>
+              <p class="indicateur__complement" id="eco-bilan-ha"></p>
+            </div>
+          </div>
+          <div class="fr-col-12 fr-col-md-6 fr-col-lg-3">
+            <div class="indicateur">
+              <p class="indicateur__libelle">Coût de l'irrigation</p>
+              <p class="indicateur__valeur"><span id="eco-cout">–</span> <span class="indicateur__unite">€/an</span></p>
+              <p class="indicateur__secondaire"><span id="eco-cout-m3">–</span> c€/m³</p>
+              <p class="indicateur__secondaire"><span id="eco-cout-ha">–</span> €/ha</p>
+            </div>
+          </div>
+          <div class="fr-col-12 fr-col-md-6 fr-col-lg-3">
+            <div class="indicateur">
+              <p class="indicateur__libelle">Investissements initiaux (CAPEX)</p>
+              <p class="indicateur__valeur"><span id="eco-capex" class="valeur-sourcee" tabindex="0" aria-describedby="eco-capex-tt">–</span> <span class="indicateur__unite">€</span></p>
+              {{ m.infobulle('eco-capex-tt', 'Matériel d\'irrigation + accès à la ressource, avant subvention') }}
+              <p class="indicateur__complement" id="eco-capex-cpl"></p>
+            </div>
+          </div>
+          <div class="fr-col-12 fr-col-md-6 fr-col-lg-3">
+            <div class="indicateur">
+              <p class="indicateur__libelle">Gain lié à l'irrigation</p>
+              <p class="indicateur__valeur"><span id="eco-gain" class="valeur-sourcee" tabindex="0" aria-describedby="eco-gain-tt">–</span> <span class="indicateur__unite">€/an</span></p>
+              {{ m.infobulle('eco-gain-tt', '(rendement irrigué − rendement pluvial) × prix de vente × surface') }}
+              <p class="indicateur__complement" id="eco-gain-cpl"></p>
+            </div>
+          </div>
+        </div>
+
+        <h3 class="fr-h5 fr-mt-5w">Décomposition du coût</h3>
+        <div class="fr-grid-row fr-grid-row--gutters">
+          <div class="fr-col-12 fr-col-lg-5">
+            {{ m.table_debut('Décomposition du coût annuel de l\'irrigation', 'table-postes') }}
+              <thead><tr><th scope="col">Poste</th><th scope="col" class="num">€/an</th><th scope="col" class="num">Part</th></tr></thead>
+              <tbody id="table-postes">
+                {% for cle, lib, col in postes %}
+                <tr data-poste="{{ cle }}"><td><span class="pastille" style="background:{{ col }}"></span>{{ lib.split(' (')[0] }}</td><td class="num" id="poste-{{ cle }}">–</td><td class="num" id="poste-{{ cle }}-part">–</td></tr>
+                {% endfor %}
+              </tbody>
+              <tfoot><tr><th scope="row">Coût total</th><td class="num" id="poste-total">–</td><td class="num">100 %</td></tr></tfoot>
+            {{ m.table_fin() }}
+            <div class="fr-accordions-group fr-mt-2w">
+              <section class="fr-accordion accordeon-bleu">
+                <h4 class="fr-accordion__title"><button type="button" class="fr-accordion__btn" aria-expanded="false" aria-controls="acc-capex">Détail des investissements</button></h4>
+                <div class="fr-collapse" id="acc-capex"><div id="detail-capex"></div></div>
+              </section>
+            </div>
+          </div>
+          <div class="fr-col-12 fr-col-lg-7">
+            <div class="bloc-graphique">
+              <div class="bloc-graphique__cadre"><canvas id="cascade" role="img" aria-label="Graphique en cascade : du gain lié à l'irrigation au bilan, poste par poste"></canvas></div>
+              <ul class="fr-btns-group fr-btns-group--inline fr-btns-group--sm fr-btns-group--icon-left fr-btns-group--right fr-mt-1w">
+                <li><button type="button" class="fr-btn fr-btn--secondary fr-icon-image-line" id="export-png">Exporter l'image (PNG)</button></li>
+                <li><button type="button" class="fr-btn fr-btn--tertiary fr-icon-file-download-line" id="export-csv">Exporter les données (CSV)</button></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="fr-callout fr-mt-4w" id="encadre-seuil">
+          <h3 class="fr-callout__title">Seuil de rentabilité</h3>
+          <p class="fr-callout__text" id="seuil-texte">–</p>
+        </div>
+
+        <div id="avertissements" class="fr-mt-3w"></div>
+
+        <div class="fr-accordions-group fr-mt-4w">
+          <section class="fr-accordion">
+            <h3 class="fr-accordion__title"><button type="button" class="fr-accordion__btn" aria-expanded="false" aria-controls="acc-cultures">Valeurs par défaut des cultures (référentiel)</button></h3>
+            <div class="fr-collapse" id="acc-cultures">
+              <p class="fr-text--sm">Valeurs utilisées lorsque la culture n'a pas de carte ou que l'option « sans carte » est cochée.</p>
+              {{ m.table_debut('Valeurs par défaut des cultures') }}
+                <thead><tr><th scope="col">Culture</th><th scope="col" class="num">Rendement irrigué (q/ha)</th><th scope="col" class="num">Rendement pluvial (q/ha)</th><th scope="col" class="num">Besoin (mm)</th><th scope="col" class="num">Prix (€/t)</th><th scope="col">Carte</th></tr></thead>
+                <tbody>
+                {% for c in ref.cultures %}{% set pp = ref.params_objet('Cultures', c) %}
+                <tr><th scope="row">{{ c }}</th>
+                  <td class="num">{{ m.valeur(pp.get('rdt_irrigue'), 'cu') }}</td>
+                  <td class="num">{{ m.valeur(pp.get('rdt_pluvial'), 'cu') }}</td>
+                  <td class="num">{{ m.valeur(pp.get('besoin_irrigation'), 'cu') }}</td>
+                  <td class="num">{{ m.valeur(pp.get('prix_vente'), 'cu') }}</td>
+                  <td>{% if c in catalogue and catalogue[c].complet %}<span class="fr-badge fr-badge--sm fr-badge--blue-ecume">{{ catalogue[c].code }}</span>{% else %}–{% endif %}</td></tr>
+                {% endfor %}
+                </tbody>
+              {{ m.table_fin() }}
+            </div>
+          </section>
+        </div>
+      </section>
+    </div>
+
+    {# ===================================================================== #}
+    {#                              ÉQUIPEMENT                               #}
+    {# ===================================================================== #}
+    <div id="panel-equipement" class="fr-tabs__panel" role="tabpanel" aria-labelledby="tab-equipement" tabindex="0">
+      <h2 class="fr-h4">Équipements d'irrigation</h2>
+      {% set g = ref.params_objet('Equipement', 'Général') %}
+      <div class="fr-grid-row fr-grid-row--gutters fr-mb-2w parametres-generaux">
+        <div class="fr-col-12 fr-col-md-6"><p class="fr-mb-1v fr-text--sm fr-text--bold">{{ g.taux_actualisation.libelle }} (%)</p>{{ m.valeur(g.taux_actualisation, 'eqg') }}</div>
+        <div class="fr-col-12 fr-col-md-6"><p class="fr-mb-1v fr-text--sm fr-text--bold">{{ g.taux_subvention.libelle }} (%)</p>{{ m.valeur(g.taux_subvention, 'eqg') }}</div>
+      </div>
+      {{ m.table_debut("Caractéristiques techniques et économiques des équipements", 'table-equipements') }}
+        <thead><tr>
+          <th scope="col">Équipement</th><th scope="col" class="num">CAPEX (€/ha)</th>
+          <th scope="col" class="num">Durée de vie (ans)</th><th scope="col" class="num">Taux d'amortissement annuel</th>
+          <th scope="col" class="num">Annuité (€/ha/an)</th>
+          <th scope="col" class="num">Coût main-d'œuvre (€/ha/an)</th>
+          <th scope="col" class="num">Coût maintenance (€/ha/an)</th>
+          <th scope="col" class="num">Coût annuel total (€/ha/an)</th>
+          <th scope="col" class="num">Efficience d'application</th>
+        </tr></thead>
+        <tbody>
+        {% for eq in ref.equipements %}{% set pp = ref.params_objet('Equipement', eq) %}{% set s = eq | slug %}
+          <tr data-equipement="{{ eq }}">
+            <th scope="row">{{ eq }}</th>
+            <td class="num">{{ m.valeur(pp.get('capex_ha'), 'eq') }}</td>
+            <td class="num"><span class="valeur-sourcee duree-vie-affichee" tabindex="0" data-defaut="{{ pp.duree_vie.valeur | brut }}" aria-describedby="dv-eq-{{ s }}-tt">{{ pp.duree_vie | valeur_param }}</span>{{ m.infobulle('dv-eq-' ~ s ~ '-tt', ref.infobulle(pp.duree_vie)) }}</td>
+            <td class="num">{{ m.derivee('d-eq-' ~ s ~ '-taux', derives['d-eq-' ~ s ~ '-taux'], 'pct', 'Facteur d\'annualisation i(1+i)ⁿ / ((1+i)ⁿ − 1)') }}</td>
+            <td class="num">{{ m.derivee('d-eq-' ~ s ~ '-annuite', derives['d-eq-' ~ s ~ '-annuite'], 'euro', 'CAPEX à l\'hectare × (1 − taux de subvention) × taux d\'amortissement annuel') }}</td>
+            <td class="num">{{ m.valeur(pp.get('mo_eur_ha'), 'eq') }}</td>
+            <td class="num">{{ m.derivee('d-eq-' ~ s ~ '-maint', derives['d-eq-' ~ s ~ '-maint'], 'euro', 'CAPEX à l\'hectare × taux de maintenance') }}</td>
+            <td class="num">{{ m.derivee('d-eq-' ~ s ~ '-total', derives['d-eq-' ~ s ~ '-total'], 'euro', 'Annuité + coût de maintenance + coût de main-d\'œuvre, à l\'hectare') }}</td>
+            <td class="num">{{ m.valeur(pp.get('efficience'), 'eq') }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      {{ m.table_fin() }}
+      <p class="fr-text--xs texte-mention">Pour l'enrouleur, le pivot et la rampe, le CAPEX de la simulation est calculé par unité (nombre entier de machines, d'après le CAPEX unitaire et la surface par unité renseignés dans le référentiel) ; pour les autres équipements, par hectare. La colonne « Durée de vie » n'est plus modifiable ligne par ligne : dans l'onglet Simulation, dépliez « Modifier la durée d'amortissement » sous le choix de l'équipement.</p>
+      {% with contexte='equipement' %}{% include "_legende_annuite.html" %}{% endwith %}
+    </div>
+
+    {# ===================================================================== #}
+    {#                         ACCÈS À LA RESSOURCE                          #}
+    {# ===================================================================== #}
+    <div id="panel-acces" class="fr-tabs__panel" role="tabpanel" aria-labelledby="tab-acces" tabindex="0">
+      <h2 class="fr-h4">Accès à la ressource en eau</h2>
+
+      {% set ga = ref.params_objet('Acces_ressource', 'Général') %}
+      <div class="fr-grid-row fr-grid-row--gutters fr-mb-2w parametres-generaux">
+        {% for code in ['taux_actualisation', 'taux_subvention', 'taux_remplissage'] %}{% if ga.get(code) %}
+        <div class="fr-col-12 fr-col-md-4"><p class="fr-mb-1v fr-text--sm fr-text--bold">{{ ga[code].libelle }} (%)</p>{{ m.valeur(ga[code], 'acg') }}</div>
+        {% endif %}{% endfor %}
+      </div>
+
+      {% for src in ref.sources if type_source(src) == 'forage' %}{% set pp = ref.params_objet('Acces_ressource', src) %}
+      <h3 class="fr-h6">Forage individuel : coût unitaire détaillé</h3>
+      {{ m.table_debut('Coût unitaire détaillé du forage individuel') }}
+        <thead><tr><th scope="col">Poste</th><th scope="col" class="num">Valeur unitaire</th><th scope="col">Unité</th><th scope="col" class="num">Montant (€)</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">{{ pp.dossier_etude.libelle }}</th><td class="num">{{ m.valeur(pp.dossier_etude, 'fo') }}</td><td>€</td><td class="num">= valeur</td></tr>
+          <tr><th scope="row">{{ pp.raccordement_electrique.libelle }}</th><td class="num">{{ m.valeur(pp.raccordement_electrique, 'fo') }}</td><td>€</td><td class="num">= valeur</td></tr>
+          <tr><th scope="row">{{ pp.foration_ml.libelle }}</th><td class="num">{{ m.valeur(pp.foration_ml, 'fo') }}</td><td>€/m</td><td class="num">{{ m.derivee('d-forage-foration', derives['d-forage-foration'], 'euro', 'Coût au mètre × profondeur') }}</td></tr>
+          <tr><th scope="row">{{ pp.profondeur.libelle }}</th><td class="num">{{ m.valeur(pp.profondeur, 'fo') }}</td><td>m</td><td class="num">–</td></tr>
+          <tr><th scope="row">{{ pp.pompe_abri.libelle }}</th><td class="num">{{ m.valeur(pp.pompe_abri, 'fo') }}</td><td>€</td><td class="num">= valeur</td></tr>
+        </tbody>
+        <tfoot><tr><th scope="row" colspan="3">Coût total du forage équipé</th><td class="num">{{ m.derivee('d-forage-total', derives['d-forage-total'], 'euro', 'Somme des postes') }}</td></tr></tfoot>
+      {{ m.table_fin() }}
+      {% endfor %}
+
+      <h3 class="fr-h6 fr-mt-4w">Coûts par type de ressource</h3>
+      {{ m.table_debut("Coûts d'accès par type de ressource", 'table-sources') }}
+        <thead><tr>
+          <th scope="col">Ressource</th><th scope="col" class="num">Coût de stockage (€/m³)</th><th scope="col" class="num">Station ou branchement (€)</th>
+          <th scope="col" class="num">Part fixe (€/ha/an)</th><th scope="col" class="num">Part volumétrique (€/m³)</th><th scope="col" class="num">Frais supplémentaires (€/an)</th>
+          <th scope="col" class="num">Subvention publique (%)</th>
+          <th scope="col" class="num">Durée de vie (ans)</th><th scope="col" class="num">Taux d'amortissement annuel</th>
+        </tr></thead>
+        <tbody>
+        {% for src in ref.sources %}{% set pp = ref.params_objet('Acces_ressource', src) %}{% set s = src | slug %}
+          <tr data-source="{{ src }}" data-type="{{ type_source(src) }}">
+            <th scope="row">{{ src }}</th>
+            <td class="num">{{ m.valeur(pp.get('cout_stockage'), 'src') if pp.get('cout_stockage') else '–' }}</td>
+            <td class="num">{% if pp.get('capex_station') %}{{ m.valeur(pp.capex_station, 'src') }}{% elif pp.get('capex_branchement') %}{{ m.valeur(pp.capex_branchement, 'src') }}{% elif type_source(src) == 'forage' %}<span class="fr-text--xs">voir ci-dessus</span>{% else %}–{% endif %}</td>
+            <td class="num">{{ m.valeur(pp.get('part_fixe'), 'src') if pp.get('part_fixe') else '–' }}</td>
+            <td class="num">{{ m.valeur(pp.get('part_volumetrique'), 'src') if pp.get('part_volumetrique') else '–' }}</td>
+            <td class="num">{{ m.valeur(pp.get('frais_supplementaires'), 'src') if pp.get('frais_supplementaires') else '–' }}</td>
+            <td class="num">{% if pp.get('taux_subvention') %}{{ m.valeur(pp.taux_subvention, 'src') }}{% else %}<span class="fr-text--xs">défaut ci-dessus</span>{% endif %}</td>
+            <td class="num"><span class="valeur-sourcee duree-vie-affichee" tabindex="0" data-defaut="{{ pp.duree_vie.valeur | brut }}" aria-describedby="dv-acc-{{ s }}-tt">{{ pp.duree_vie | valeur_param }}</span>{{ m.infobulle('dv-acc-' ~ s ~ '-tt', ref.infobulle(pp.duree_vie)) }}</td>
+            <td class="num">{{ m.derivee('d-acc-' ~ s ~ '-taux', derives['d-acc-' ~ s ~ '-taux'], 'pct', 'Facteur d\'annualisation i(1+i)ⁿ / ((1+i)ⁿ − 1)') }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      {{ m.table_fin() }}
+
+      <h3 class="fr-h6 fr-mt-4w">Réseau d'amenée entre la source et la parcelle</h3>
+      {{ m.table_debut("Réseau d'amenée") }}
+        <thead><tr><th scope="col">Paramètre</th><th scope="col" class="num">Valeur</th><th scope="col">Unité</th></tr></thead>
+        <tbody>
+          {% for code in ['cout_tuyau_ml', 'distance_source_parcelle', 'duree_vie_reseau'] %}{% if ga.get(code) %}
+          <tr><th scope="row">{{ ga[code].libelle }}</th><td class="num">{{ m.valeur(ga[code], 'res') }}</td><td>{{ ga[code].unite }}</td></tr>
+          {% endif %}{% endfor %}
+          <tr><th scope="row">Taux d'amortissement annuel du réseau</th><td class="num">{{ m.derivee('d-acc-reseau-taux', derives['d-acc-reseau-taux'], 'pct', 'Facteur d\'annualisation') }}</td><td>par an</td></tr>
+        </tbody>
+        <tfoot><tr><th scope="row">Investissement du réseau (avant subvention)</th><td class="num">{{ m.derivee('d-acc-reseau-capex', derives['d-acc-reseau-capex'], 'euro', 'Distance × coût des tuyaux') }}</td><td>€</td></tr></tfoot>
+      {{ m.table_fin() }}
+      {% with contexte='acces' %}{% include "_legende_annuite.html" %}{% endwith %}
+    </div>
+
+    {# ===================================================================== #}
+    {#                               RESSOURCES                              #}
+    {# ===================================================================== #}
+    <div id="panel-ressources" class="fr-tabs__panel" role="tabpanel" aria-labelledby="tab-ressources" tabindex="0">
+      <h2 class="fr-h4">Redevance pour prélèvement des agences de l'eau</h2>
+      <p class="fr-text--sm">Taux en centimes d'euro par m³ prélevé, usage irrigation hors gravitaire, 12<sup>e</sup> programme (réforme des redevances applicable depuis le 1<sup>er</sup> janvier 2025). Catégorie 1 : hors zone de répartition des eaux ; catégorie 2 : en ZRE. La ligne de l'agence retenue pour la simulation est mise en évidence.</p>
+      {{ m.table_debut("Taux de redevance par agence de l'eau", 'table-redevances') }}
+        <thead><tr>
+          <th scope="col">Agence de l'eau</th><th scope="col" class="num">Cat. 1 – superficielle</th><th scope="col" class="num">Cat. 2 – superficielle</th>
+          <th scope="col" class="num">Cat. 1 – souterraine</th><th scope="col" class="num">Cat. 2 – souterraine</th>
+          <th scope="col" class="num">Seuil cat. 1 (m³/an)</th><th scope="col" class="num">Seuil cat. 2 (m³/an)</th><th scope="col" class="num">Retenue taxée hors ZRE</th>
+        </tr></thead>
+        <tbody>
+        {% for a in ref.agences %}{% set pp = ref.params_objet('Ressources', a) %}
+          <tr data-agence="{{ a }}">
+            <th scope="row">{{ a }}</th>
+            {% for code in ['cat1_superficielle', 'cat2_superficielle', 'cat1_souterraine', 'cat2_souterraine', 'seuil_cat1', 'seuil_cat2', 'retenue_hors_zre'] %}
+            <td class="num">{% if code == 'retenue_hors_zre' and pp.get(code) %}<span class="valeur-sourcee" tabindex="0" aria-describedby="rz-{{ a | slug }}">{{ 'oui' if pp[code].valeur else 'non' }}</span>{{ m.infobulle('rz-' ~ (a | slug), ref.infobulle(pp[code])) }}{% else %}{{ m.valeur(pp.get(code), 'ag') }}{% endif %}</td>
+            {% endfor %}
+          </tr>
+        {% endfor %}
+        </tbody>
+      {{ m.table_fin() }}
+      <div class="fr-callout fr-callout--blue-ecume fr-mt-2w">
+        <p class="fr-callout__text fr-text--md" id="redevance-courante">Sélectionnez une commune pour déterminer l'agence de l'eau.</p>
+      </div>
+
+      <h2 class="fr-h4 fr-mt-5w">Énergie</h2>
+      {% set ge = ref.params_objet('Ressources', 'Énergie') %}
+      <div class="fr-grid-row fr-grid-row--gutters fr-mb-2w parametres-generaux">
+        <div class="fr-col-12 fr-col-md-6"><p class="fr-mb-1v fr-text--sm fr-text--bold">{{ ge.prix_energie_m3.libelle }} (€/m³)</p>{{ m.valeur(ge.prix_energie_m3, 'nrj') }}</div>
+      </div>
+      <p class="fr-text--sm">Prix forfaitaire de l'énergie de pompage (CGEDD, 2020), commun à tous les équipements et à toutes les sources d'eau, et appliqué au volume prélevé (et, le cas échéant, au volume pompé pour remplir une retenue). Lorsque l'eau est livrée sous pression (réseau collectif, ASA), l'énergie est déjà comprise dans la part volumétrique de l'accès à la ressource et n'est pas facturée séparément : le coût réel pour la situation simulée est visible dans l'onglet Simulation.</p>
+    </div>
+
+    {# ===================================================================== #}
+    {#                                ANALYSE                                #}
+    {# ===================================================================== #}
+    <div id="panel-analyse" class="fr-tabs__panel" role="tabpanel" aria-labelledby="tab-analyse" tabindex="0">
+      <h2 class="fr-h4">Limites de la modélisation et éléments de réflexion</h2>
+
+      <div class="fr-accordions-group fr-mt-3w">
+
+        <section class="fr-accordion">
+          <h3 class="fr-accordion__title"><button type="button" class="fr-accordion__btn" aria-expanded="false" aria-controls="an-formules">Formules du coût annuel</button></h3>
+          <div class="fr-collapse" id="an-formules">
+            <p>Le coût annuel de l'irrigation (onglet Simulation, tuile « Coût de l'irrigation ») est la somme brute de
+              cinq postes, sans pondération supplémentaire :</p>
+            <ul>
+              <li><strong>Redevance de l'agence de l'eau</strong> = volume prélevé × taux de redevance (catégorie 1 ou
+                2 selon le zonage ZRE, origine souterraine ou superficielle), si le volume dépasse le seuil
+                d'assujettissement ou si l'accès est collectif ; nulle sinon.</li>
+              <li><strong>Énergie</strong> = volume facturé × prix forfaitaire de l'énergie de pompage (7 c€/m³,
+                CGEDD 2020) ; nulle si l'eau est livrée sous pression (réseau collectif, ASA), le coût étant alors déjà
+                compris dans la part volumétrique de l'accès. Le volume facturé et sa composition sont détaillés
+                ci-dessous.</li>
+              <li><strong>Équipement</strong> = (CAPEX du matériel d'irrigation net de subvention × facteur
+                d'annualisation) + coût de maintenance annuel.</li>
+              <li><strong>Main-d'œuvre</strong> = coût de main-d'œuvre propre à l'équipement (€/ha/an) × surface
+                irriguée.</li>
+              <li><strong>Accès à la ressource</strong> = (CAPEX de l'ouvrage et du réseau d'amenée, net de subvention,
+                × facteur d'annualisation) + part fixe + part volumétrique + frais supplémentaires propres à la
+                source d'eau.</li>
+            </ul>
+            <p>Le facteur d'annualisation ramène un investissement initial (CAPEX) à une annuité constante sur sa durée
+              de vie, au taux d'actualisation retenu : <code>i·(1+i)ⁿ / ((1+i)ⁿ − 1)</code>, ou <code>1/n</code> si le
+              taux est nul. Il est calculé séparément pour le matériel d'irrigation et pour l'ouvrage d'accès (durées de
+              vie et taux distincts) — voir les onglets Équipement et Accès à la ressource.</p>
+
+            <h4 class="fr-h6 fr-mt-3w">Volume prélevé et volume de remplissage : deux notions distinctes</h4>
+            <p>Le <strong>volume prélevé</strong> est le volume d'eau qu'il faut retirer de la source pour satisfaire le
+              besoin d'irrigation de la parcelle : <code>volume prélevé = besoin (mm) × 10 × surface (ha) ÷ efficience
+              du matériel</code>. C'est ce volume qui sert de base à la redevance, à la part volumétrique de l'accès et
+              au bilan agronomique affiché dans l'onglet Simulation (« Volume total d'eau d'irrigation »).</p>
+            <p>Le <strong>volume de remplissage par pompage</strong> n'existe que pour une source de type retenue : il
+              représente le volume qu'il faut pomper depuis le milieu naturel (rivière, nappe) pour remplir la retenue,
+              en plus du volume ensuite repris dans la retenue pour irriguer. C'est donc un second pompage, physiquement
+              distinct du premier : dans le modèle, il est estimé comme le volume utile de la retenue rapporté à un
+              adhérent (<code>capacité × taux de remplissage ÷ nombre d'adhérents</code>), et n'intervient que dans le
+              calcul de l'énergie — <code>volume facturé = volume prélevé + volume de remplissage</code> — jamais dans
+              la redevance, la part volumétrique ou le bilan agronomique. Pour toute source qui n'est pas une retenue,
+              ce volume est nul.</p>
+            <p class="fr-text--sm texte-mention">Point de vigilance non résolu à ce stade : le modèle applique ce
+              second pompage aussi bien à une retenue de pompage (remplie en pompant depuis une rivière ou une nappe)
+              qu'à une retenue collinaire (remplie par ruissellement et pluviométrie, sans pompage de remplissage). Pour
+              une retenue collinaire, ce volume de remplissage ne devrait normalement pas être facturé en énergie.</p>
+          </div>
+        </section>
+
+        <section class="fr-accordion">
+          <h3 class="fr-accordion__title"><button type="button" class="fr-accordion__btn" aria-expanded="false" aria-controls="an-rendement">Rendements, gains et prix de vente</button></h3>
+          <div class="fr-collapse" id="an-rendement">
+            <ul>
+              <li>Le gain est un simple différentiel de rendement (irrigué − pluvial) multiplié par un prix de vente fixe : il ne capture ni la variabilité climatique interannuelle, ni le risque d'aléas (grêle, maladies favorisées par l'irrigation), ni les effets qualité (calibre, teneur en sucre ou en protéines) que l'irrigation améliore souvent au-delà du seul tonnage.</li>
+              <li>Pour les cultures marquées « irrigation condition d'existence » (agrumes, tomates industrielles, pomme, abricot…), le rendement pluvial retenu est arbitraire ou nul : le « gain » calculé et le seuil de rentabilité associé n'ont alors pas de sens agronomique, puisque ne pas irriguer ces cultures n'est pas une option réelle.</li>
+              <li>Le prix de vente est fixe et non affecté par le volume produit, ni par la contractualisation (filière industrielle, cahier des charges d'appellation) : la volatilité interannuelle des prix, qui peut inverser un bilan d'une campagne à l'autre, n'est pas représentée.</li>
+              <li>Le calcul raisonne culture par culture et hectare par hectare : il ne représente pas les effets de système que permet l'irrigation (sécurisation d'un assolement plus rémunérateur, diversification, accès à des contrats industriels exigeant une régularité de livraison).</li>
+              <li>Aucune valorisation du risque évité par l'irrigation (assurance récolte moins coûteuse, accès facilité au crédit, sécurisation du revenu et de la trésorerie de l'exploitation).</li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="fr-accordion">
+          <h3 class="fr-accordion__title"><button type="button" class="fr-accordion__btn" aria-expanded="false" aria-controls="an-equipement">Équipement d'irrigation et mutualisation</button></h3>
+          <div class="fr-collapse" id="an-equipement">
+            <ul>
+              <li>Le CAPEX est calculé pour un équipement neuf, dimensionné strictement pour la surface saisie (nombre d'unités arrondi au supérieur) : aucune mutualisation entre exploitations n'est représentée par défaut — c'est l'objet de l'option « matériel déjà amorti », qui permet de simuler un équipement existant, mais sans modéliser l'acquisition mutualisée elle-même.</li>
+              <li><strong>Élément de réflexion — limites de la mutualisation :</strong> partager un enrouleur ou une rampe (CUMA, entraide, prestation de service) peut réduire le CAPEX à l'hectare, mais le modèle ne représente pas les contraintes que cela introduit : tous les adhérents ont typiquement le même besoin en eau au même moment (pointe de juillet-août), ce qui limite la capacité réelle de partage ; le matériel mobile demande du temps de transport et de manutention entre parcelles ; sa disponibilité au moment critique n'est pas garantie ; la coordination (tours d'eau, planning) a un coût d'organisation ; et la responsabilité de l'entretien peut se diluer entre utilisateurs. Diviser simplement le CAPEX par le nombre d'exploitations surestime donc probablement le gain réel de la mutualisation.</li>
+              <li>Les durées de vie et coûts de maintenance proviennent de sources hétérogènes (2013 à 2025) avec des écarts parfois importants d'une source à l'autre (par exemple la durée d'amortissement d'un pivot va de 10 à 25 ans selon la référence) : la valeur retenue dans le référentiel est une convention, pas une mesure de terrain propre à chaque exploitation.</li>
+              <li>Aucune valeur résiduelle de revente en fin de vie, ni coût de démantèlement ou de dépose, ne sont comptés.</li>
+              <li>Le coût de main-d'œuvre retenu (pose, dépose, campagne) ne couvre pas le temps de pilotage de l'irrigation (décision d'irriguer, surveillance, gestion des tours d'eau), qui peut être significatif, notamment en goutte-à-goutte ou en gestion collective.</li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="fr-accordion">
+          <h3 class="fr-accordion__title"><button type="button" class="fr-accordion__btn" aria-expanded="false" aria-controls="an-acces">Accès à la ressource et aléas</button></h3>
+          <div class="fr-collapse" id="an-acces">
+            <ul>
+              <li>L'entretien courant d'un ouvrage (curage, géomembrane, vannes, digues) n'est plus compté dans le calcul : le coût affiché sous-estime donc le coût réel de possession d'une retenue ou d'un forage sur toute sa durée de vie.</li>
+              <li>Le coût de stockage (€/m³) et le coût de forage sont des valeurs moyennes ou issues de dires d'expert : ils ne reflètent pas la topographie du site (volume de terrassement), la nature du sol (nécessité ou non d'une géomembrane), la profondeur réelle de la nappe, ni la difficulté d'accès du chantier — l'écart avec un devis réel peut être important, à la hausse comme à la baisse.</li>
+              <li>Le modèle suppose un accès sécurisé à 100 % du volume nécessaire chaque année. Il ne représente ni le risque de restriction de prélèvement en période de sécheresse (arrêtés-cadre), ni le risque hydrologique de non-remplissage d'une retenue (le taux de remplissage de 85 % est une moyenne, pas une probabilité d'occurrence annuelle garantie), ni un volume prélevable plafonné par un plan de gestion de la ressource en eau ou une autorisation administrative.</li>
+              <li>Le foncier nécessaire à l'implantation d'un ouvrage (emprise, acquisition ou location, indemnisation) n'est pas valorisé, alors qu'il peut être un facteur bloquant du projet — de même que les délais d'instruction administrative (déclaration ou autorisation loi sur l'eau), qui peuvent s'étendre sur plusieurs années et ne sont traduits par aucun coût d'opportunité dans le modèle.</li>
+              <li>Les impacts environnementaux (milieux aquatiques, continuité écologique, usages à l'aval) et un éventuel coût de mesures compensatoires ne sont pas intégrés au coût du projet.</li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="fr-accordion">
+          <h3 class="fr-accordion__title"><button type="button" class="fr-accordion__btn" aria-expanded="false" aria-controls="an-financement">Financement et subventions</button></h3>
+          <div class="fr-collapse" id="an-financement">
+            <ul>
+              <li>Les taux de subvention par défaut (70 % pour les retenues, 45 % pour un forage, 0 % pour le matériel d'irrigation) sont des hypothèses de travail, pas des droits acquis : l'aide réelle dépend d'un dossier individuel, d'un zonage, de plafonds souvent exprimés en valeur absolue (ce qui pénalise proportionnellement les gros projets), et de l'enveloppe disponible au moment de la demande (guichets Agence de l'eau, Région, FranceAgriMer, Europe, PCAE pour le matériel).</li>
+              <li>Un taux d'actualisation générique (3 % par défaut) est utilisé pour tous les projets et tous les exploitants : il ne reflète pas le coût réel du crédit (taux d'emprunt négocié, apport personnel, capacité d'autofinancement) propre à chaque situation.</li>
+              <li>Aucun effet de trésorerie n'est modélisé (échéancier de remboursement, TVA, amortissement comptable, fiscalité IS/IR) : le calcul raisonne en coût économique annualisé et lissé, pas en flux de trésorerie réels perçus par l'exploitant année par année.</li>
+              <li>Le coût d'opportunité du temps d'instruction du dossier (subvention et autorisation administrative), parfois plusieurs années, n'est pas valorisé alors qu'il retarde d'autant le retour sur investissement.</li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="fr-accordion">
+          <h3 class="fr-accordion__title"><button type="button" class="fr-accordion__btn" aria-expanded="false" aria-controls="an-energie">Énergie</button></h3>
+          <div class="fr-collapse" id="an-energie">
+            <ul>
+              <li>Le coût de l'énergie de pompage est volontairement un prix forfaitaire unique (7 c€/m³, CGEDD 2020), identique pour tous les équipements et toutes les sources d'eau (hors eau livrée sous pression) : un pompage de surface à faible hauteur et un relevage de forage profond sont facturés au même tarif forfaitaire, alors que leur consommation réelle d'énergie diffère fortement selon la hauteur de pompage. Cette hauteur n'est pas modélisée.</li>
+              <li>Ce prix forfaitaire ne reflète pas les offres tarifaires réelles (heures creuses agricoles, autoconsommation photovoltaïque, contrats individuels), ni son évolution depuis 2020.</li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="fr-accordion">
+          <h3 class="fr-accordion__title"><button type="button" class="fr-accordion__btn" aria-expanded="false" aria-controls="an-portee">Portée générale du modèle</button></h3>
+          <div class="fr-collapse" id="an-portee">
+            <ul>
+              <li>C'est un modèle statique annuel : un seul jeu d'hypothèses moyennes est simulé à la fois, sans distribution de probabilité ni analyse de sensibilité automatisée. Faire varier les paramètres (prix, subvention, rendement) pour tester des scénarios reste à la charge de l'utilisateur.</li>
+              <li>Les valeurs par défaut proviennent de sources hétérogènes en date et en méthode (barèmes professionnels, témoignages d'experts, guides techniques, rapports scientifiques) : le niveau de fiabilité affiché (documenté, calculé, estimé) indique l'origine de chaque valeur, mais la précision réelle reste très variable d'un paramètre à l'autre.</li>
+              <li>Le modèle raisonne à l'échelle d'un projet individuel : il n'évalue pas les effets cumulés à l'échelle d'un bassin versant (multiplication des prélèvements, conflits d'usage, impact cumulé sur le débit des cours d'eau et les milieux).</li>
+              <li>Aucune actualisation automatique des prix (inflation, coût des matériaux, prix de l'énergie) au-delà de la date des sources citées dans l'onglet Références.</li>
+            </ul>
+          </div>
+        </section>
+
+      </div>
+    </div>
+
+    {# ===================================================================== #}
+    {#                                  CARTO                                #}
+  </div>
+</div>
+
+<script id="donnees-page" type="application/json">{{ {
+  'exemple': exemple,
+  'prix_cultures': prix_cultures,
+  'surface_unitaire': surface_unitaire,
+  'duree_vie_equipements': duree_vie_equipements,
+  'duree_vie_sources': duree_vie_sources,
+  'cartes_completes': cartes_completes,
+  'cartes_variables': cartes_variables,
+  'fond_carte': fond_carte,
+  'defaut': {'commune': COMMUNE_DEFAUT, 'departement': DEPARTEMENT_DEFAUT, 'culture': CULTURE_DEFAUT}
+} | tojson }}</script>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='vendor/leaflet/leaflet.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/chartjs/chart.umd.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/cascade.js') }}"></script>
+<script src="{{ url_for('static', filename='js/carte-commune.js') }}"></script>
+<script src="{{ url_for('static', filename='js/projet.js') }}"></script>
+{% endblock %}

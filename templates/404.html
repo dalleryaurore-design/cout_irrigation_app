@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block contenu %}
+<div class="fr-container fr-my-7w">
+  <h1 class="fr-h2">Page introuvable</h1>
+  <p class="fr-text--lead">L'adresse demandée n'existe pas.</p>
+  <a class="fr-btn" href="{{ url_for('projet') }}">Revenir au projet</a>
+</div>
+{% endblock %}

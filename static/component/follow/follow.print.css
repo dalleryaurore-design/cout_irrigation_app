@@ -1,0 +1,16 @@
+/*!
+ * DSFR v1.15.3 | SPDX-License-Identifier: Etalab-2.0 | License-Filename: LICENSE.md | restricted use (see terms and conditions)
+ */
+@charset "UTF-8";
+@media print {
+  /**
+  * Mixin d'ajout des icones des réseaux sociaux
+  **/
+
+  /**
+  * Mixin d'ajout des icones des réseaux sociaux
+  **/
+  .fr-follow {
+    display: none;
+  }
+}

@@ -1,0 +1,19 @@
+<div class="fr-accordions-group fr-mt-3w">
+  <section class="fr-accordion accordeon-bleu">
+    <h3 class="fr-accordion__title">
+      <button type="button" class="fr-accordion__btn" aria-expanded="false" aria-controls="legende-annuite-{{ contexte }}">Comment l'annuité est-elle calculée à partir du CAPEX ?</button>
+    </h3>
+    <div class="fr-collapse" id="legende-annuite-{{ contexte }}">
+      <p>L'investissement initial (CAPEX) est converti en une <strong>annuité constante</strong>, c'est-à-dire le montant qu'il faudrait verser chaque année pendant la durée de vie de l'équipement pour rembourser le capital et sa rémunération au taux d'actualisation.</p>
+      <p class="formule">Annuité = CAPEX × (1 − taux de subvention) × <em>a</em>
+        &nbsp;&nbsp;avec&nbsp;&nbsp; <em>a</em> = <em>i</em> (1 + <em>i</em>)<sup><em>n</em></sup> / [(1 + <em>i</em>)<sup><em>n</em></sup> − 1]</p>
+      <ul>
+        <li>taux de subvention : {% if contexte == 'acces' %}de l'ouvrage et du réseau d'amenée (nul par défaut pour le matériel){% else %}du matériel d'irrigation (nul par défaut){% endif %} ;</li>
+        <li><em>i</em> : taux d'actualisation ({% if contexte == 'acces' %}accès à la ressource{% else %}équipements{% endif %}) ;</li>
+        <li><em>n</em> : durée de vie en années ;</li>
+        <li><em>a</em> : facteur d'annualisation, appelé ici « taux d'amortissement annuel ». Si <em>i</em> = 0, <em>a</em> = 1/<em>n</em> (amortissement linéaire).</li>
+      </ul>
+      <p class="fr-mb-0"><strong>Application à la simulation en cours :</strong> <span id="annuite-{{ contexte }}-exemple">sélectionnez une situation dans l'onglet Simulation.</span></p>
+    </div>
+  </section>
+</div>

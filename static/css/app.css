@@ -1,0 +1,134 @@
+/* =========================================================================
+   Analyse financière de l'irrigation — styles complémentaires au DSFR.
+   Le DSFR fournit la grille, les composants et les couleurs ; ce fichier ne
+   traite que ce qu'il ne couvre pas (cartes, graphique, valeurs sourcées).
+   Toutes les couleurs sont reprises des variables du DSFR quand elles existent.
+   ========================================================================= */
+
+/* ------------------------------------------------------------------ Cartes */
+.carte {
+  width: 100%;
+  border: 1px solid var(--border-default-grey);
+  background: var(--background-alt-grey);
+}
+.carte--simulation { height: 32rem; min-height: 24rem; }
+.bloc-carte { position: sticky; top: 1rem; }
+.leaflet-container { font-family: inherit; background: var(--background-alt-grey); }
+.leaflet-container a { color: var(--text-action-high-blue-france); }
+.contour-commune { transition: opacity .2s; }
+
+.legendes-cartes-variables {
+  display: flex; flex-direction: column; gap: .375rem; margin-top: .75rem;
+  padding: .5rem .75rem; border: 1px solid var(--border-default-grey); background: var(--background-default-grey);
+}
+.legende-var { display: flex; align-items: center; gap: .5rem; font-size: .75rem; }
+.legende-var__libelle { flex: 0 0 auto; min-width: 11rem; }
+.legende-var__barre { flex: 1 1 auto; height: .75rem; border: 1px solid var(--border-default-grey); }
+.legende-var__valeurs { flex: 0 0 auto; color: var(--text-mention-grey); white-space: nowrap; }
+
+/* ------------------------------------------- Recherche de commune */
+.recherche-commune { position: relative; }
+.suggestions {
+  position: absolute; z-index: 1000; left: 0; right: 0;
+  margin: 0; padding: 0; list-style: none; max-height: 18rem; overflow-y: auto;
+  background: var(--background-default-grey);
+  border: 1px solid var(--border-default-grey);
+  box-shadow: var(--overlap-shadow, 0 4px 12px rgba(0, 0, 18, .16));
+}
+.suggestions li {
+  padding: .5rem .75rem; cursor: pointer; font-size: .875rem;
+  border-bottom: 1px solid var(--border-default-grey);
+}
+.suggestions li:last-child { border-bottom: 0; }
+.suggestions li:hover,
+.suggestions li[aria-selected="true"] { background: var(--background-alt-blue-france); }
+.suggestions .suggestion__dep { color: var(--text-mention-grey); }
+
+/* ------------------------------------------------ Valeurs sourcées */
+.valeur-sourcee {
+  border-bottom: 1px dotted var(--text-mention-grey);
+  cursor: help;
+}
+.valeur-sourcee:focus { outline: 2px solid var(--border-active-blue-france); outline-offset: 2px; }
+.valeur-calculee { font-variant-numeric: tabular-nums; }
+.texte-mention { color: var(--text-mention-grey); }
+
+.champ-cellule { display: inline-flex; align-items: center; gap: .25rem; }
+.champ-cellule .fr-input { width: 6.5rem; text-align: right; padding: .25rem .5rem; font-size: .875rem; height: auto; }
+.champ-suffixe { font-size: .75rem; color: var(--text-mention-grey); }
+.champ-avec-action { display: flex; align-items: flex-start; gap: .5rem; flex-wrap: wrap; }
+.champ-avec-action .fr-input { flex: 1 1 8rem; }
+.champ-param--modifie { box-shadow: inset 0 -2px 0 0 var(--background-action-high-blue-france); }
+
+.tableau-barre-outils { display: flex; justify-content: flex-end; margin-bottom: .25rem; }
+
+.parametres-generaux .fr-input { display: inline-block; }
+
+/* ------------------------------------------------------- Tableaux */
+.fr-table td.num, .fr-table th.num { text-align: right; white-space: nowrap; }
+.fr-table tbody tr.ligne-active { background: var(--background-alt-blue-france); }
+.fr-table tbody tr.ligne-active th[scope="row"] { font-weight: 700; }
+.pastille {
+  display: inline-block; width: .625rem; height: .625rem; border-radius: 50%;
+  margin-right: .5rem; vertical-align: baseline;
+}
+
+/* ----------------------------------------------------- Indicateurs */
+.indicateur {
+  height: 100%; padding: 1rem;
+  background: var(--background-alt-grey);
+  border-left: .25rem solid var(--border-default-grey);
+}
+.indicateur__libelle { font-size: .875rem; color: var(--text-mention-grey); margin: 0 0 .25rem; }
+.indicateur__valeur { font-size: 1.5rem; font-weight: 700; margin: 0; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.indicateur__unite { font-size: .875rem; font-weight: 400; color: var(--text-mention-grey); }
+.indicateur__secondaire { font-size: .9375rem; margin: .125rem 0 0; font-variant-numeric: tabular-nums; }
+.indicateur__complement { font-size: .75rem; color: var(--text-mention-grey); margin: .375rem 0 0; }
+.indicateur--bilan { border-left-color: var(--text-default-grey); }
+.indicateur--positif { border-left-color: #18753C; }
+.indicateur--positif .indicateur__valeur { color: #18753C; }
+.indicateur--negatif { border-left-color: #CE0500; }
+.indicateur--negatif .indicateur__valeur { color: #CE0500; }
+
+/* ------------------------------------------------------- Graphique */
+.bloc-graphique__cadre {
+  position: relative; height: 26rem; padding: .5rem;
+  border: 1px solid var(--border-default-grey);
+  background: var(--background-default-grey);
+}
+#cascade { max-width: 100%; }
+
+/* ------------------------------------------------ Divers composants */
+.titre-section { border-top: 1px solid var(--border-default-grey); padding-top: 1.5rem; }
+.accordeon-bleu .fr-accordion__btn { color: var(--text-action-high-blue-france); }
+.accordeon-bleu .fr-collapse {
+  background: var(--background-alt-blue-france);
+  border-left: .25rem solid var(--border-action-high-blue-france);
+}
+.accordeon-bleu .fr-collapse--expanded { padding: 1rem; }
+.formule {
+  font-family: ui-monospace, "Cascadia Mono", "Segoe UI Mono", Consolas, monospace;
+  background: var(--background-alt-grey); padding: .5rem .75rem; font-size: .875rem;
+}
+.texte-scenario p { margin-bottom: .75rem; }
+.texte-scenario p:last-child { margin-bottom: 0; }
+.bloc-conditionnel { border-left: .125rem solid var(--border-default-grey); padding-left: 1rem; margin-left: .25rem; }
+.formulaire-projet .fr-fieldset { margin-bottom: 1rem; }
+.fiche-exemple { margin: 0; font-size: .875rem; }
+.fiche-exemple > div { display: flex; gap: .5rem; padding: .125rem 0; }
+.fiche-exemple dt { color: var(--text-mention-grey); flex: 0 0 8rem; }
+.fiche-exemple dd { margin: 0; font-weight: 500; }
+.carte-exemple { height: 100%; }
+.liste-references { padding-left: 1.25rem; }
+.liste-references .reference { margin-bottom: 1rem; }
+.liste-references .reference:target { background: var(--background-alt-blue-france); outline: .25rem solid var(--background-alt-blue-france); }
+#detail-capex .fr-table { margin-bottom: 0; }
+
+/* ------------------------------------------------------ Impression */
+@media print {
+  .fr-header, .fr-footer, .fr-btns-group, .fr-tabs__list, .suggestions { display: none !important; }
+  .fr-tabs__panel { display: block !important; opacity: 1 !important; }
+  .carte--simulation { height: 12rem; }
+  .bloc-graphique__cadre { height: 18rem; border: 0; }
+  .indicateur { border: 1px solid #000; }
+}

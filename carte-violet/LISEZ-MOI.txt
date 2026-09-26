@@ -1,0 +1,24 @@
+Cartes .tif (besoin en eau et rendements potentiels) — narratif « violet »
+d'Explore2, RCP4.5. Dossier lu par défaut par l'application (DOSSIER_CARTES
+dans config.py, ou variable d'environnement IRRIG_CARTES).
+
+Convention de nommage reconnue automatiquement :
+    culture_<CODE>_<conduite>_<variable>_<contexte>.tif
+
+    irrigue_irr  -> besoin en eau d'irrigation
+    irrigue_pot  -> rendement potentiel irrigué
+    rainfed_pot  -> rendement potentiel pluvial
+
+Deux horizons sont présents pour chaque culture (2020-2040 et 2040-2060) ;
+la feuille « Cartes » du référentiel (referentiel/referentiel_irrigation.xlsx)
+déclare actuellement l'horizon 2020-2040.
+
+Certaines cultures existent en plusieurs variantes (semis) : maisT (maïs
+grain) / maisEnsilT (maïs ensilage), orgeh (orge d'hiver) / orgep (orge de
+printemps), poish (pois d'hiver) / poisp (pois de printemps). Le référentiel
+en retient une par défaut (maisT, orgeh, poisp) ; changer les noms de
+fichiers dans la feuille « Cartes » pour retenir l'autre variante.
+
+Les trois fichiers d'une culture doivent être présents pour que ses cartes
+soient utilisées. Voir le README pour le détail (unités, système de
+coordonnées, extraction à la commune).

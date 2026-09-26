@@ -1,0 +1,11 @@
+# Fichiers non nécessaires au fonctionnement de l'application en ligne
+documentation/
+couts _irrigation.xlsx
+referentiel/*.backup-*.xlsx
+~$*.xlsx
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/

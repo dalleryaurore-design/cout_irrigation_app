@@ -1,0 +1,23 @@
+/*!
+ * DSFR v1.15.3 | SPDX-License-Identifier: Etalab-2.0 | License-Filename: LICENSE.md | restricted use (see terms and conditions)
+ */
+@charset "UTF-8";
+
+/* ¯¯¯¯¯¯¯¯¯ *\
+  DISPLAY
+\* ˍˍˍˍˍˍˍˍˍ */
+.fr-display .fr-fieldset__element:last-child {
+  margin-bottom: 0;
+}
+@media (min-width: 36em) {
+  /*! media sm */
+}
+@media (min-width: 48em) {
+  /*! media md */
+}
+@media (min-width: 62em) {
+  /*! media lg */
+}
+@media (min-width: 78em) {
+  /*! media xl */
+}
