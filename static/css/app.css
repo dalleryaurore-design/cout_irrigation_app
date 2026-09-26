@@ -84,6 +84,8 @@
 .indicateur__unite { font-size: .875rem; font-weight: 400; color: var(--text-mention-grey); }
 .indicateur__secondaire { font-size: .9375rem; margin: .125rem 0 0; font-variant-numeric: tabular-nums; }
 .indicateur__complement { font-size: .75rem; color: var(--text-mention-grey); margin: .375rem 0 0; }
+.indicateur__ligne { font-size: 1rem; margin: .25rem 0 0; font-variant-numeric: tabular-nums; }
+.indicateur__ligne .valeur-sourcee { font-size: 1.25rem; font-weight: 700; }
 .indicateur--bilan { border-left-color: var(--text-default-grey); }
 .indicateur--positif { border-left-color: #18753C; }
 .indicateur--positif .indicateur__valeur { color: #18753C; }
@@ -101,6 +103,7 @@
 /* ------------------------------------------------ Divers composants */
 .titre-section { border-top: 1px solid var(--border-default-grey); padding-top: 1.5rem; }
 .accordeon-bleu .fr-accordion__btn { color: var(--text-action-high-blue-france); }
+.fr-accordion__btn.accordeon-discret { font-size: .8125rem; font-weight: 400; min-height: 0; padding-top: .5rem; padding-bottom: .5rem; }
 .accordeon-bleu .fr-collapse {
   background: var(--background-alt-blue-france);
   border-left: .25rem solid var(--border-action-high-blue-france);

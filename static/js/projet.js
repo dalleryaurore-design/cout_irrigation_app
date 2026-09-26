@@ -186,7 +186,7 @@
       equipement: $("equipement").value,
       agence: $("agence").value,
       zre: $("zre").checked,
-      sans_carte: $("sans-carte").checked,
+      sans_carte: !!document.querySelector('input[name="methode-rendement"][value="reference"]:checked'),
       type_retenue: retenue ? retenue.value : "individuelle",
       nb_adherents: parseInt($("nb-adherents").value, 10) || 1,
       capacite_auto: $("capacite-auto").checked,
@@ -450,11 +450,19 @@
     texte("agro-rdt-plu", fmt(a.rdt_pluvial, 1));
     texte("agro-besoin", fmt(a.besoin_mm, 0));
     texte("agro-volume", fmt(a.volume_preleve, 0));
-    texte("agro-rdt-irr-cpl", "soit " + fmt(a.delta_rdt, 1) + " q/ha de plus qu'en pluvial");
-    texte("agro-rdt-plu-cpl", a.origine === "carte" ? "Lu sur la carte" : "Valeur du référentiel");
-    var LIBELLES_METHODE = { carte: "carte", sgpe: "méthode SGPE", reference: "référentiel" };
-    texte("agro-besoin-cpl", "soit " + fmt(a.dose_m3_ha, 0) + " m³/ha appliqués · " +
-      (LIBELLES_METHODE[a.methode_besoin] || "référentiel"));
+    /* Rendements : « Carte » indisponible (grisé) si la culture n'a pas de carte */
+    /* (bascule automatique sur « Référence », annulée dès qu'une culture avec carte est choisie) */
+    var radioCarte = $("methode-rendement-carte");
+    radioCarte.disabled = !a.carte_disponible;
+    if (!a.carte_disponible && radioCarte.checked) {
+      $("methode-rendement-reference").checked = true;
+      etat.rendementBascule = true;
+    } else if (a.carte_disponible && etat.rendementBascule) {
+      etat.rendementBascule = false;
+      radioCarte.checked = true;
+      planifier();
+    }
+    radioCarte.title = a.carte_disponible ? "" : "Pas de carte de rendement pour cette culture.";
     var dispoMethodes = a.methodes_besoin || {};
     var indisponibles = [];
     document.querySelectorAll('input[name="methode-besoin"]').forEach(function (r) {
@@ -467,37 +475,22 @@
         ? "SGPE indisponible pour « " + culture + " » : coefficients culturaux (Kc) non renseignés." : "",
       indisponibles.indexOf("carte") >= 0 ? "Carte indisponible pour « " + culture + " »." : ""
     ].filter(Boolean).join(" "));
-    texte("agro-volume-cpl", "volume prélevé, efficience " + pct(a.efficience, 0) +
-      " (appliqué : " + fmt(a.volume_applique, 0) + " m³)");
+    texte("agro-volume-cpl", "Efficience du matériel : " + pct(a.efficience, 0));
     var bulles = a.infobulles || {};
     texte("agro-rdt-irr-tt", bulles.rdt_irrigue || "");
     texte("agro-rdt-plu-tt", bulles.rdt_pluvial || "");
     texte("agro-besoin-tt", bulles.besoin_mm || "");
     texte("agro-volume-tt", "Besoin (mm) × 10 × surface ÷ efficience d'application du matériel · Calculé [C]");
 
-    var notes = (a.notes || []).slice();
-    if (a.origine === "carte" && a.methode_besoin === "carte") {
-      notes.unshift("Rendements et besoin en eau lus sur les cartes du modèle agronomique pour la commune.");
-    } else if (a.origine === "carte") {
-      notes.unshift("Rendements lus sur les cartes du modèle agronomique pour la commune.");
-    }
-    if (a.methode_besoin === "sgpe" && a.sgpe) {
-      notes.push("Besoin en eau calculé par la méthode SGPE (Σ ETP × Kc − P, " + a.sgpe.libelle_horizon + ").");
-    }
+    var notes = a.notes || [];
     html("notes-agro", notes.length
       ? '<div class="fr-alert fr-alert--info fr-alert--sm"><p>' + notes.join("<br>") + "</p></div>" : "");
-    texte("etat-cartes", a.carte_disponible
-      ? "Des cartes existent pour cette culture : décochez pour lire les rendements sur les cartes, cochez pour comparer aux valeurs par défaut."
-      : "Aucune carte pour cette culture : les rendements du référentiel sont utilisés.");
-    $("sans-carte").disabled = !a.carte_disponible;
 
     /* --- Bilan économique */
     var tuile = $("tuile-bilan");
     tuile.classList.toggle("indicateur--positif", res.bilan.total >= 0);
     tuile.classList.toggle("indicateur--negatif", res.bilan.total < 0);
     texte("eco-bilan", (res.bilan.total >= 0 ? "+" : "−") + fmt(Math.abs(res.bilan.total), 0));
-    texte("eco-bilan-ha", fmt(res.bilan.par_ha, 0) + " €/ha · " +
-      (res.bilan.total >= 0 ? "l'irrigation couvre son coût" : "l'irrigation ne couvre pas son coût"));
     texte("eco-cout", fmt(c.total, 0));
     texte("eco-cout-m3", fmt(c.c_par_m3, 1));
     texte("eco-cout-ha", fmt(c.par_ha, 0));
@@ -741,11 +734,14 @@
     VARIABLES_CARTE.forEach(function (v) {
       $("carte-var-" + v.id).addEventListener("change", function () { rafraichirCoucheVariable(v.id); });
     });
-    ["zre", "sans-carte", "deja-amorti", "deja-amorti-equipement", "capacite-auto"].forEach(function (id) {
+    ["zre", "deja-amorti", "deja-amorti-equipement", "capacite-auto"].forEach(function (id) {
       $(id).addEventListener("change", planifier);
     });
-    document.querySelectorAll('input[name="type-retenue"], input[name="methode-besoin"]').forEach(function (r) {
-      r.addEventListener("change", planifier);
+    document.querySelectorAll('input[name="type-retenue"], input[name="methode-besoin"], input[name="methode-rendement"]').forEach(function (r) {
+      r.addEventListener("change", function () {
+        if (r.name === "methode-rendement") { etat.rendementBascule = false; }
+        planifier();
+      });
     });
     $("nb-unites").addEventListener("change", function () { etat.nbUnitesManuel = true; planifier(); });
     $("prix-retablir").addEventListener("click", function () { prixParDefaut(); planifier(); });
