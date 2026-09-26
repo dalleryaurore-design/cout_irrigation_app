@@ -51,6 +51,11 @@ app.config["JSON_AS_ASCII"] = False
 app.json.ensure_ascii = False
 REF = GestionnaireReferentiel(config.REFERENTIEL)
 _cache_extraction: "OrderedDict[tuple, dict]" = OrderedDict()
+# Les classeurs .xlsx sont des archives zip dont les noms de fichiers se décodent en cp437.
+# Ce codec est importé ici, avant le thread de préchauffage : si ce thread et la première
+# requête l'importaient en même temps, Python pourrait le déclarer inconnu jusqu'au
+# redémarrage (« LookupError: unknown encoding: cp437 », observé sur Render).
+import encodings.cp437  # noqa: E402,F401
 climat.prechauffer(config.CLIMAT)
 
 

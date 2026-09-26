@@ -2,7 +2,7 @@
 documentation/
 couts _irrigation.xlsx
 referentiel/*.backup-*.xlsx
-~$*.xlsx
+~$*
 
 # Python
 __pycache__/
