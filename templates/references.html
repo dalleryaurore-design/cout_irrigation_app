@@ -12,9 +12,8 @@
         <li id="ref-{{ r.id }}" class="reference">
           <p class="fr-mb-1v">{{ r.complete }}{% if r.url %} <a class="fr-link fr-link--sm" href="{{ r.url }}" target="_blank" rel="noopener" title="{{ r.courte }} – nouvelle fenêtre">{{ r.url }}</a>{% endif %}</p>
           <p class="fr-text--xs texte-mention fr-mb-0">
-            Citée comme ({{ r.courte }}) · {{ r.type }}
+            Citée comme ({{ r.courte }})
             {% if usage.get(r.id) %} · {{ usage[r.id] }} valeur{{ 's' if usage[r.id] > 1 }} du référentiel{% endif %}
-            {% if r.statut and r.statut != 'Vérifiée' %} · <span class="fr-badge fr-badge--sm fr-badge--warning fr-badge--no-icon">{{ r.statut }}</span>{% elif r.statut %} · <span class="fr-badge fr-badge--sm fr-badge--success fr-badge--no-icon">Vérifiée</span>{% endif %}
           </p>
         </li>
         {% endfor %}
@@ -114,11 +113,11 @@
       <h3 class="fr-accordion__title"><button type="button" class="fr-accordion__btn" aria-expanded="false" aria-controls="m-couts">Postes de coût</button></h3>
       <div class="fr-collapse" id="m-couts">
         <ul>
-          <li><strong>Énergie</strong> = volume prélevé × [kWh/m³ du matériel + hauteur de relevage ÷ (367 × rendement de la pompe)] × prix de l'électricité, auquel s'ajoute le remplissage d'une retenue par pompage. Si l'eau est livrée sous pression (réseau collectif, ASA), l'énergie de mise en pression est comprise dans la part volumétrique.</li>
-          <li><strong>Redevance agence de l'eau</strong> = volume prélevé × taux de l'agence (catégorie 1 ou 2, eaux superficielles ou souterraines), si le prélèvement dépasse le seuil d'assujettissement. Pour une gestion collective (ASA, réseau, retenue collective), la redevance est due par la structure et répercutée.</li>
-          <li><strong>Équipement</strong> = CAPEX × facteur d'annualisation + CAPEX × taux de maintenance. Le CAPEX de l'enrouleur, du pivot et de la rampe est calculé par unité ; celui des autres matériels, par hectare.</li>
-          <li><strong>Main-d'œuvre</strong> = heures par hectare × surface × coût horaire.</li>
-          <li><strong>Accès à la ressource</strong> = (CAPEX de l'ouvrage + réseau d'amenée) × (1 − subvention) × facteur d'annualisation + entretien de l'ouvrage + part fixe + part volumétrique + frais supplémentaires. Pour une retenue collective, le coût de l'ouvrage est réparti entre les adhérents.</li>
+          <li><strong>Énergie</strong> = (volume prélevé + volume prélevé × part du remplissage pompée) × prix forfaitaire de l'énergie (0,07 €/m³, CGEDD 2020). La part pompée vaut 0 pour une retenue collinaire (remplissage par ruissellement et précipitations) et 95 % par défaut pour une retenue par pompage (remplissage hivernal, complété par la pluie sur le plan d'eau). Si l'eau est livrée sous pression par une ASA (réseau collectif), l'énergie est comprise dans la part volumétrique et n'est pas facturée séparément.</li>
+          <li><strong>Redevance agence de l'eau</strong> = volume prélevé × taux de l'agence (catégorie 1 ou 2, eaux superficielles ou souterraines), si le prélèvement dépasse le seuil d'assujettissement ou si la gestion est collective. Pour une ASA, la redevance est acquittée par le gestionnaire et comprise dans son tarif : elle n'est pas ajoutée une seconde fois.</li>
+          <li><strong>Équipement</strong> = CAPEX × (1 − subvention) × facteur d'annualisation + maintenance. Le CAPEX de l'enrouleur, du pivot et de la rampe est calculé par unité ; celui des autres matériels, par hectare.</li>
+          <li><strong>Main-d'œuvre</strong> = coût de main-d'œuvre de l'équipement (€/ha/an) × surface.</li>
+          <li><strong>Accès à la ressource</strong> = CAPEX de l'ouvrage × (1 − subvention) × facteur d'annualisation de l'ouvrage + réseau d'amenée (distance propre au type d'accès × coût des tuyaux) × (1 − subvention) × facteur d'annualisation du réseau + part fixe + part volumétrique. Pour une retenue collective, le coût de l'ouvrage est réparti entre les adhérents ; la station de reprise vers la parcelle est réputée comprise dans le coût au m³ stocké.</li>
         </ul>
         <p class="formule">Facteur d'annualisation a = i (1 + i)<sup>n</sup> / [(1 + i)<sup>n</sup> − 1] ; a = 1/n si i = 0</p>
       </div>

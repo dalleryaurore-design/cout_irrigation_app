@@ -53,8 +53,6 @@ class Reference:
     courte: str
     complete: str
     url: str = ""
-    type: str = ""
-    statut: str = ""
 
     @property
     def citation(self) -> str:
@@ -189,8 +187,7 @@ def _lire(chemin: str) -> Referentiel:
                 continue
             ref.references[_texte(ligne[0])] = Reference(
                 id=_texte(ligne[0]), courte=_texte(ligne[1]), complete=_texte(ligne[2]),
-                url=_texte(ligne[3]) if len(ligne) > 3 else "", type=_texte(ligne[4]) if len(ligne) > 4 else "",
-                statut=_texte(ligne[5]) if len(ligne) > 5 else "")
+                url=_texte(ligne[3]) if len(ligne) > 3 else "")
 
     # --- Paramètres (format long)
     for feuille in FEUILLES_PARAMETRES:

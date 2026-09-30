@@ -86,8 +86,11 @@ valeurs de `COMMUNE_DEFAUT` / `DEPARTEMENT_DEFAUT` / `CULTURE_DEFAUT` de `config
 (par défaut : Saint-Ouen-du-Breuil, 76890, blé tendre), modifiable via les variables
 d'environnement `IRRIG_COMMUNE_DEFAUT`, `IRRIG_DEPARTEMENT_DEFAUT`, `IRRIG_CULTURE_DEFAUT`.
 
-- *Prix de vente* : valeur du référentiel pour la culture retenue, modifiable ; le
-  bouton « Valeur par défaut » la rétablit.
+- *Prix de vente* : deux jeux de valeurs au choix — **prix de marché** (`prix_vente` :
+  prix payés aux producteurs FranceAgriMer, moyenne olympique 2020/21-2024/25, pour les
+  grandes cultures) ou **barème MASAA** de l'assurance récolte 2026 (`prix_masaa`, valeur
+  centrale du barème de prix assuré). Modifiable ; le bouton « Valeur par défaut » rétablit
+  la valeur du jeu choisi.
 - *Utiliser les rendements par défaut du référentiel (sans carte)* : n'est actif que pour
   les cultures disposant de cartes ; permet de comparer la lecture cartographique aux
   valeurs par défaut.
@@ -114,8 +117,8 @@ d'environnement `IRRIG_COMMUNE_DEFAUT`, `IRRIG_DEPARTEMENT_DEFAUT`, `IRRIG_CULTU
   vide, la valeur par défaut de cet objet s'applique. Elle ne se modifie plus ligne par
   ligne dans les tableaux des onglets Équipement / Accès à la ressource (colonnes
   « Durée de vie » devenues lecture seule).
-- *Subvention* : deux curseurs distincts — l'un pour le matériel d'irrigation (nul par
-  défaut, aucun barème national unique), l'autre pour l'ouvrage d'accès à l'eau et le
+- *Subvention* : deux curseurs distincts — l'un pour le matériel d'irrigation (subvention
+  de l'État, 40 % par défaut), l'autre pour l'ouvrage d'accès à l'eau et le
   réseau d'amenée (70 % pour une retenue, 45 % pour un forage, par défaut).
 - *Rendement potentiel irrigué / Rendement potentiel pluvial / Besoin en eau
   d'irrigation* : trois cases à cocher indépendantes, chacune superpose au fond de carte
@@ -173,7 +176,7 @@ un bandeau d'avertissement s'affiche.
 | `Lisez-moi` | conventions de saisie |
 | `Cultures` | 24 cultures × rendement irrigué, rendement pluvial, besoin d'irrigation, prix de vente, condition d'existence |
 | `Equipement` | 6 matériels × CAPEX, efficience, main-d'œuvre, maintenance, durée de vie ; paramètres généraux (taux d'actualisation, taux de subvention du matériel) |
-| `Acces_ressource` | 6 ressources × investissement, entretien, part fixe et volumétrique, hauteurs de pompage, durées de vie ; paramètres généraux (subvention, réseau d'amenée, taux d'actualisation) |
+| `Acces_ressource` | 5 types d'accès (forage, cours d'eau, retenue collinaire, retenue par pompage, ASA) × investissement, part fixe et volumétrique, distance d'amenée, durées de vie ; paramètres généraux (subvention, réseau d'amenée, taux d'actualisation) |
 | `Ressources` | redevances des 6 agences de l'eau, seuils d'assujettissement, prix de l'énergie |
 | `Cartes` | déclaration des fichiers .tif par culture |
 | `Exemples` | les six exemples pré-remplis |
@@ -255,14 +258,17 @@ Références.
 volume appliqué (m³) = besoin (mm) × 10 × surface (ha)
 volume prélevé  (m³) = volume appliqué ÷ efficience d'application
 
-énergie      = volume prélevé × [kWh/m³ du matériel + HMT ÷ (367 × rendement pompe)] × prix kWh
-               (+ remplissage hivernal d'une retenue par pompage)
+énergie      = (volume prélevé + volume prélevé × part du remplissage pompée) × prix forfaitaire (€/m³)
+               part pompée : 0 pour une retenue collinaire (ruissellement + pluie),
+               95 % par défaut pour une retenue par pompage ; sans objet hors retenue
 redevance    = volume prélevé × taux de l'agence (catégorie 1 ou 2, eaux superficielles
-               ou souterraines), si le prélèvement dépasse le seuil d'assujettissement
-équipement   = CAPEX × a + CAPEX × taux de maintenance
-main-d'œuvre = heures/ha × surface × coût horaire
-accès        = (ouvrage + réseau) × (1 − subvention) × a + entretien
-               + part fixe + part volumétrique + frais supplémentaires
+               ou souterraines), si le prélèvement dépasse le seuil d'assujettissement ;
+               non ajoutée pour l'ASA (comprise dans son tarif)
+équipement   = CAPEX × (1 − subvention) × a + maintenance
+main-d'œuvre = coût de main-d'œuvre de l'équipement (€/ha/an) × surface
+accès        = ouvrage × (1 − subvention) × a_ouvrage
+               + distance d'amenée (propre au type d'accès) × coût des tuyaux × (1 − subvention) × a_réseau
+               + part fixe + part volumétrique
 
 a = i (1 + i)ⁿ / [(1 + i)ⁿ − 1]        facteur d'annualisation ; a = 1/n si i = 0
 
@@ -273,10 +279,16 @@ prix minimal   = coût total ÷ [(Δ rendement) × 0,1 × surface]
 Δ rendement minimal à prix constant = coût total ÷ (0,1 × prix × surface)
 ```
 
-Lorsque l'eau est livrée sous pression (réseau collectif, ASA), l'énergie de mise en
-pression est réputée comprise dans la part volumétrique et n'est pas facturée en kWh.
-Pour une gestion collective (ASA, réseau, retenue collective), la redevance est due par
-la structure et répercutée quel que soit le volume individuel.
+Le type d'accès « ASA » représente tout réseau collectif sous pression, quel que soit son
+gestionnaire (ASA d'irrigants, société d'aménagement régional, concessionnaire d'un canal) :
+même tarification binomiale, seule la gouvernance diffère. L'énergie de mise en pression
+et la redevance de prélèvement, acquittées par le gestionnaire, sont réputées comprises
+dans son tarif et ne sont pas facturées séparément (règle appliquée d'office).
+Pour une retenue collective, la redevance est due par la structure quel que soit le
+volume individuel.
+L'eau de l'ASA est livrée en bord de parcelle : sa distance d'amenée vaut 0 par défaut.
+Pour les retenues, la station de reprise vers la parcelle est réputée comprise dans le
+coût de construction au m³ stocké.
 
 ---
 

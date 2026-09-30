@@ -194,7 +194,8 @@
       deja_amorti: $("deja-amorti").checked,
       deja_amorti_equipement: $("deja-amorti-equipement").checked,
       nb_unites: (etat.nbUnitesManuel && $("nb-unites").value) ? parseInt($("nb-unites").value, 10) : null,
-      prix_vente: parseFloat($("prix-vente").value) || null
+      prix_vente: parseFloat($("prix-vente").value) || null,
+      source_prix: sourcePrix()
     };
   }
 
@@ -252,9 +253,10 @@
 
     function objetCourant() { return opts.objetCourant ? opts.objetCourant() : selecteur.value; }
 
-    function ligneTableau(nom) {
+    /* Une ressource occupe plusieurs lignes du tableau d'accès : on cherche la cellule dans toutes. */
+    function celluleDureeVie(nom) {
       var attribut = opts.feuille === "Equipement" ? "equipement" : "source";
-      return document.querySelector(opts.selecteurTableau + ' tr[data-' + attribut + '="' + CSS.escape(nom) + '"]');
+      return document.querySelector(opts.selecteurTableau + ' tr[data-' + attribut + '="' + CSS.escape(nom) + '"] .duree-vie-affichee');
     }
 
     function majAffichage() {
@@ -279,8 +281,7 @@
       var v = parseInt(brut, 10);
       var actif = brut !== "" && !isNaN(v);
       if (actif) { etat.surcharges[cle] = v; } else { delete etat.surcharges[cle]; }
-      var ligne = ligneTableau(nom);
-      var cellule = ligne ? ligne.querySelector(".duree-vie-affichee") : null;
+      var cellule = celluleDureeVie(nom);
       if (cellule) {
         cellule.textContent = actif ? String(v) : cellule.dataset.defaut;
         cellule.classList.toggle("champ-param--modifie", actif);
@@ -295,14 +296,23 @@
   }
 
   /* Prix de vente : valeur du référentiel pour la culture choisie */
+  /* Deux jeux de prix : prix de marché du référentiel, ou barème du prix assuré MASAA (assurance récolte) */
   var PRIX = PAGE.prix_cultures || {};
+  var LIBELLES_PRIX = { referentiel: "prix de marché du référentiel", masaa: "barème MASAA de l'assurance récolte 2026" };
+
+  function sourcePrix() {
+    var r = document.querySelector('input[name="source-prix"]:checked');
+    return r ? r.value : "referentiel";
+  }
 
   function prixParDefaut() {
-    var p = PRIX[$("culture").value];
-    if (p !== undefined) { $("prix-vente").value = p; }
+    var src = sourcePrix();
+    var p = (PRIX[src] || {})[$("culture").value];
+    if (p === undefined || p === null) { p = (PRIX.referentiel || {})[$("culture").value]; }
+    if (p !== undefined && p !== null) { $("prix-vente").value = p; }
     var aide = $("prix-aide");
     if (aide) {
-      aide.textContent = "Valeur du référentiel pour « " + $("culture").value + " » : " +
+      aide.textContent = "Valeur « " + LIBELLES_PRIX[src] + " » pour « " + $("culture").value + " » : " +
         fmt(p, p !== undefined && p % 1 ? 1 : 0) + " €/t. Modifiable.";
     }
   }
@@ -498,8 +508,10 @@
     texte("eco-gain-cpl", fmt(res.gain.par_ha, 0) + " €/ha · " + fmtS(a.delta_rdt) + " q/ha × " +
       fmtS(res.gain.prix) + " €/t");
     texte("eco-gain-tt", "(rendement irrigué − rendement pluvial) × 0,1 × prix de vente × surface");
+    texte("eco-rac", fmt(res.capex.reste_a_charge, 0));
     texte("eco-capex", fmt(res.capex.total, 0));
-    var complementCapex;
+    texte("eco-subv", fmt(res.capex.total - res.capex.reste_a_charge, 0));
+    var complementCapex = "";
     if (res.capex.deja_amorti && res.capex.deja_amorti_equipement) {
       complementCapex = "Matériel d'irrigation et accès à la ressource déjà amortis : aucun investissement compté, " +
         "seuls les coûts de fonctionnement subsistent.";
@@ -507,9 +519,6 @@
       complementCapex = "Matériel d'irrigation déjà amorti : seul l'accès à la ressource est compté en investissement.";
     } else if (res.capex.deja_amorti) {
       complementCapex = "Accès à la ressource déjà amorti : seul le matériel d'irrigation est compté.";
-    } else {
-      complementCapex = "dont " + euros(res.capex.subvention + res.capex.subvention_equipement, 0) +
-        " de subvention · reste à charge " + euros(res.capex.reste_a_charge, 0);
     }
     texte("eco-capex-cpl", complementCapex);
     texte("eco-capex-tt", "Matériel d'irrigation (" + euros(res.capex.equipement, 0) + ") + accès à la ressource (" +
@@ -538,13 +547,15 @@
       '<div class="fr-table__container"><div class="fr-table__content"><table id="detail-capex-tableau">' +
       "<caption>Détail des investissements</caption><thead><tr><th scope=\"col\">Poste</th>" +
       "<th scope=\"col\" class=\"num\">Montant</th></tr></thead><tbody>" +
+      "<tr class=\"ligne-reste-a-charge\"><th scope=\"row\"><strong>Reste à charge pour l'agriculteur</strong></th>" +
+      "<td class=\"num\"><strong>" + euros(res.capex.reste_a_charge, 0) + "</strong></td></tr>" +
       "<tr><th scope=\"row\">Matériel d'irrigation" +
       (d.nb_unites ? " (" + d.nb_unites + " unité" + (d.nb_unites > 1 ? "s" : "") + ")" : "") +
       "</th><td class=\"num\">" + euros(res.capex.equipement, 0) + "</td></tr>" + ligneSubvEquip + lignes +
       "<tr><th scope=\"row\">Subvention publique (accès à la ressource)</th><td class=\"num\">− " +
       euros(res.capex.subvention, 0) +
-      "</td></tr></tbody><tfoot><tr><th scope=\"row\">Reste à charge</th><td class=\"num\">" +
-      euros(res.capex.reste_a_charge, 0) + "</td></tr></tfoot></table></div></div></div></div>");
+      "</td></tr></tbody><tfoot><tr><th scope=\"row\">Investissement total (avant subvention)</th><td class=\"num\">" +
+      euros(res.capex.total, 0) + "</td></tr></tfoot></table></div></div></div></div>");
 
     /* --- Retenue : capacité retenue par le calcul */
     if (d.capacite !== null && d.capacite !== undefined) {
@@ -613,7 +624,9 @@
     html("redevance-courante", r.agence
       ? "Situation simulée : <strong>" + r.agence + "</strong>, eaux " + r.origine + "s, catégorie " + r.categorie +
         " (" + (res.entrees.zre ? "ZRE" : "hors ZRE") + ") — taux retenu <strong>" + fmt(r.taux_c_m3, 2) +
-        " c€/m³</strong>. " + (r.due
+        " c€/m³</strong>. " + (r.incluse
+          ? "Redevance acquittée par le gestionnaire du réseau collectif (ASA) et comprise dans son tarif : elle n'est pas ajoutée."
+          : r.due
           ? "Redevance due : " + euros(res.couts.postes.filter(function (p) { return p.cle === "redevance"; })[0].montant, 0) + "/an."
           : "Prélèvement inférieur au seuil d'assujettissement de " + fmt(r.seuil, 0) + " m³/an : redevance non due.") +
         (r.regle_retenue ? " Retenue en ZRE : l'agence applique le taux hors ZRE au remplissage hivernal." : "")
@@ -633,7 +646,8 @@
     texte("annuite-acces-exemple", an.acces.capex_brut
       ? "CAPEX " + euros(an.acces.capex_brut, 0) + " × (1 − " + pct(an.acces.subvention, 0) + ") = " +
         euros(an.acces.capex_net, 0) + " ; annuité " + euros(an.acces.annuite, 0) + "/an (taux " +
-        pct(an.acces.taux, 1) + ", durée " + fmt(an.acces.duree_ouvrage, 0) + " ans pour l'ouvrage et " +
+        pct(an.acces.taux, 1) + ", durée " + fmt(an.acces.duree_ouvrage, 0) + " ans pour l'ouvrage, " +
+        (an.acces.capex_pompe_net ? fmt(an.acces.duree_pompe, 0) + " ans pour la station de pompage et " : "") +
         fmt(an.acces.duree_reseau, 0) + " ans pour le réseau)."
       : "Aucun investissement d'accès à la ressource dans la situation simulée (infrastructure déjà amortie ou " +
         "eau facturée au volume).");
@@ -745,6 +759,9 @@
     });
     $("nb-unites").addEventListener("change", function () { etat.nbUnitesManuel = true; planifier(); });
     $("prix-retablir").addEventListener("click", function () { prixParDefaut(); planifier(); });
+    document.querySelectorAll('input[name="source-prix"]').forEach(function (r) {
+      r.addEventListener("change", function () { prixParDefaut(); planifier(); });
+    });
 
     $("export-png").addEventListener("click", function () {
       cascade.exporterPNG("cascade-" + (etat.commune ? etat.commune.nom : "irrigation") + "-" + $("culture").value);

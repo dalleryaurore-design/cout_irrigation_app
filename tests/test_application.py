@@ -42,7 +42,7 @@ class TestReferentiel(unittest.TestCase):
         self.assertGreater(len(REF.params), 200)
         self.assertEqual(len(REF.cultures), 24)
         self.assertEqual(len(REF.equipements), 6)
-        self.assertEqual(len(REF.sources), 6)
+        self.assertEqual(len(REF.sources), 5)
         self.assertEqual(len(REF.agences), 6)
         self.assertEqual(len(REF.exemples), 6)
 
@@ -95,7 +95,7 @@ class TestOutils(unittest.TestCase):
 
     def test_type_source(self):
         attendus = {"Forage individuel": "forage", "Pompage sur cours d'eau": "cours_eau",
-                    "Réseau collectif alimenté par canal": "reseau", "Retenue collinaire": "retenue_collinaire",
+                    "Réseau collectif alimenté par canal": "asa", "Retenue collinaire": "retenue_collinaire",
                     "Retenue par pompage": "retenue_pompage", "ASA": "asa"}
         for nom, t in attendus.items():
             self.assertEqual(type_source(nom), t, nom)
@@ -175,6 +175,16 @@ class TestMoteur(unittest.TestCase):
         equilibre2 = simuler(REF, entrees(), {}, agro2)
         self.assertAlmostEqual(equilibre2["bilan"]["total"], 0.0, places=4)
 
+    def test_deux_jeux_de_prix(self):
+        """Prix de marché (référentiel) ou barème MASAA de l'assurance récolte, au choix."""
+        for c in REF.cultures:
+            self.assertIsNotNone(REF.param("Cultures", c, "prix_masaa"), c)
+        marche = simuler(REF, entrees(), {}, AGRO)
+        masaa = simuler(REF, entrees(source_prix="masaa"), {}, AGRO)
+        self.assertEqual(marche["gain"]["prix"], REF.valeur("Cultures", "Maïs", "prix_vente"))
+        self.assertEqual(masaa["gain"]["prix"], REF.valeur("Cultures", "Maïs", "prix_masaa"))
+        self.assertNotEqual(marche["gain"]["prix"], masaa["gain"]["prix"])
+
     def test_subvention_et_capital_rembourse(self):
         # Le forage a un taux de subvention documenté propre (défaut 45 %) : on surcharge cette clé.
         plein = simuler(REF, entrees(), {"Acces_ressource|Forage individuel|taux_subvention": 0.0}, AGRO)
@@ -188,8 +198,8 @@ class TestMoteur(unittest.TestCase):
         self.assertEqual(plein["capex"]["equipement"], aide["capex"]["equipement"])
 
     def test_subvention_equipement(self):
-        # La subvention du matériel (nulle par défaut) réduit l'annuité mais pas le CAPEX brut affiché
-        sans = simuler(REF, entrees(), {}, AGRO)
+        # La subvention du matériel réduit l'annuité mais pas le CAPEX brut affiché
+        sans = simuler(REF, entrees(), {"Equipement|Général|taux_subvention": 0.0}, AGRO)
         avec = simuler(REF, entrees(), {"Equipement|Général|taux_subvention": 0.4}, AGRO)
         self.assertEqual(sans["capex"]["equipement"], avec["capex"]["equipement"])
         self.assertAlmostEqual(avec["capex"]["equipement_net"], avec["capex"]["equipement"] * 0.6)
@@ -252,13 +262,55 @@ class TestMoteur(unittest.TestCase):
 
     def test_energie_sous_pression(self):
         """Sur un réseau sous pression, l'énergie n'est pas facturée séparément (comprise dans la part volumétrique)."""
-        reseau = simuler(REF, entrees(source="Réseau collectif alimenté par canal"), {}, AGRO)
+        reseau = simuler(REF, entrees(source="ASA"), {}, AGRO)
         forage = simuler(REF, entrees(source="Forage individuel"), {}, AGRO)
         self.assertTrue(reseau["energie"]["pression_fournie"])
         couts_reseau = dict((p["cle"], p["montant"]) for p in reseau["couts"]["postes"])
         couts_forage = dict((p["cle"], p["montant"]) for p in forage["couts"]["postes"])
         self.assertEqual(couts_reseau["energie"], 0.0)
         self.assertGreater(couts_forage["energie"], 0.0)
+
+    def test_energie_des_retenues(self):
+        """Collinaire : seule la reprise vers la parcelle est pompée ; par pompage : remplissage hivernal en plus."""
+        collinaire = simuler(REF, entrees(source="Retenue collinaire"), {}, AGRO)
+        pompage = simuler(REF, entrees(source="Retenue par pompage"), {}, AGRO)
+        v = collinaire["agro"]["volume_preleve"]
+        self.assertAlmostEqual(collinaire["energie"]["volume_facture"], v)
+        self.assertEqual(collinaire["energie"]["volume_remplissage"], 0.0)
+        part = REF.valeur("Acces_ressource", "Retenue par pompage", "part_remplissage_pompe")
+        self.assertGreater(part, 0.0)
+        self.assertAlmostEqual(pompage["energie"]["volume_facture"], v * (1 + part))
+
+    def test_redevance_incluse_dans_le_tarif_asa(self):
+        asa = simuler(REF, entrees(source="ASA", agence="Loire-Bretagne"), {}, AGRO)
+        forage = simuler(REF, entrees(source="Forage individuel", agence="Loire-Bretagne"), {}, AGRO)
+        self.assertTrue(asa["redevance"]["incluse"])
+        self.assertEqual(dict((p["cle"], p["montant"]) for p in asa["couts"]["postes"])["redevance"], 0.0)
+        self.assertGreater(dict((p["cle"], p["montant"]) for p in forage["couts"]["postes"])["redevance"], 0.0)
+        # Eau livrée sous pression en bord de parcelle : ni énergie, ni réseau d'amenée par défaut
+        self.assertEqual(asa["energie"]["volume_facture"], 0.0)
+        self.assertEqual(asa["annualisation"]["acces"]["capex_reseau_net"], 0.0)
+
+    def test_forage_deux_durees_de_vie(self):
+        """Forage (40 ans) et station de pompage (20 ans) sont amortis séparément (CDAF, 2025)."""
+        e = entrees(source="Forage individuel")
+        cle_d = "Acces_ressource|Forage individuel|distance_amenee"
+        r = simuler(REF, e, {cle_d: 0}, AGRO)
+        an = r["annualisation"]["acces"]
+        pompe = REF.valeur("Acces_ressource", "Forage individuel", "pompe_abri")
+        s = an["subvention"]
+        attendu = ((an["capex_brut"] - pompe) * an["facteur_ouvrage"] + pompe * an["facteur_pompe"]) * (1 - s)
+        self.assertAlmostEqual(an["annuite"], attendu)
+        self.assertAlmostEqual(an["facteur_pompe"], facteur_annualisation(an["taux"], 20))
+        self.assertAlmostEqual(an["facteur_ouvrage"], facteur_annualisation(an["taux"], 40))
+        self.assertAlmostEqual(an["capex_brut"], 87500)
+
+    def test_distance_amenee_par_source(self):
+        cle = "Acces_ressource|Forage individuel|distance_amenee"
+        pres = simuler(REF, entrees(), {cle: 100}, AGRO)
+        loin = simuler(REF, entrees(), {cle: 1000}, AGRO)
+        cout_ml = REF.valeur("Acces_ressource", "Général", "cout_tuyau_ml")
+        self.assertAlmostEqual(loin["capex"]["acces_brut"] - pres["capex"]["acces_brut"], 900 * cout_ml)
 
     def test_couleurs_imposees(self):
         couleurs = dict((c, col) for c, _, col in POSTES)
@@ -275,6 +327,7 @@ class TestMoteur(unittest.TestCase):
                 self.assertIn(f"d-eq-{slug(eq)}-{suffixe}", d)
         for src in REF.sources:
             self.assertIn(f"d-acc-{slug(src)}-taux", d)
+            self.assertIn(f"d-res-{slug(src)}-capex", d)
         self.assertIn("d-forage-total", d)
         self.assertGreater(d["d-forage-total"], 0)
 

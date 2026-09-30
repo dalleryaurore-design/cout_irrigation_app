@@ -43,7 +43,7 @@ from flask import Flask, abort, jsonify, redirect, render_template, request, sen
 
 import config
 from moteur import cartes, climat
-from moteur.calcul import POSTES, COULEUR_BILAN, COULEUR_GAIN, simuler, valeurs_derivees, type_source
+from moteur.calcul import POSTES, COULEUR_BILAN, COULEUR_GAIN, code_prix, simuler, valeurs_derivees, type_source
 from moteur.referentiel import GestionnaireReferentiel, slug
 
 app = Flask(__name__)
@@ -151,7 +151,8 @@ def projet():
     if n:
         exemple = next((x for x in ref.exemples if x["id"] == n), None)
     derives = valeurs_derivees(ref, {}, {"equipement": ref.equipements[0] if ref.equipements else ""})
-    prix_cultures = {c: ref.valeur("Cultures", c, "prix_vente") for c in ref.cultures}
+    prix_cultures = {"referentiel": {c: ref.valeur("Cultures", c, "prix_vente") for c in ref.cultures},
+                     "masaa": {c: ref.valeur("Cultures", c, "prix_masaa") for c in ref.cultures}}
     surface_unitaire = {eq: ref.valeur("Equipement", eq, "surface_unitaire")
                         for eq in ref.equipements if ref.param("Equipement", eq, "surface_unitaire")}
     duree_vie_equipements = {eq: ref.valeur("Equipement", eq, "duree_vie") for eq in ref.equipements}
@@ -293,10 +294,12 @@ def api_simulation():
     if not e.get("agence") and commune and commune.get("departement"):
         e["agence"] = ref.agence_du_departement(commune["departement"]) or ""
     # Le prix de vente saisi dans le formulaire est traité comme une surcharge du référentiel.
+    if e.get("source_prix") not in ("referentiel", "masaa"):
+        e["source_prix"] = "referentiel"
     prix = e.pop("prix_vente", None)
     if prix not in (None, ""):
         try:
-            surcharges[f"Cultures|{e['culture']}|prix_vente"] = float(prix)
+            surcharges[f"Cultures|{e['culture']}|{code_prix(e['source_prix'])}"] = float(prix)
         except (TypeError, ValueError):
             pass
     e["surcharges"] = surcharges

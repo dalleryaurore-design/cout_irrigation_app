@@ -90,10 +90,22 @@
               <div class="fr-fieldset__element">
                 <div class="fr-input-group">
                   <label class="fr-label" for="prix-vente">Prix de vente de la culture (€/t)</label>
+                  <fieldset class="fr-fieldset fr-mb-1w" id="source-prix" aria-labelledby="leg-source-prix">
+                    <legend class="fr-sr-only" id="leg-source-prix">Origine du prix de vente</legend>
+                    {% for val, lib in [('referentiel', 'Prix de marché (référentiel)'), ('masaa', 'Barème MASAA (assurance récolte)')] %}
+                    <div class="fr-fieldset__element fr-fieldset__element--inline fr-mb-0">
+                      <div class="fr-radio-group fr-radio-group--sm">
+                        <input type="radio" id="source-prix-{{ val }}" name="source-prix" value="{{ val }}" {% if loop.first %}checked{% endif %}>
+                        <label class="fr-label" for="source-prix-{{ val }}">{{ lib }}</label>
+                      </div>
+                    </div>
+                    {% endfor %}
+                  </fieldset>
                   <div class="champ-avec-action">
                     <input class="fr-input" type="number" id="prix-vente" min="0" step="1" inputmode="decimal">
                     <button type="button" class="fr-btn fr-btn--tertiary-no-outline fr-btn--sm fr-icon-arrow-go-back-line fr-btn--icon-left" id="prix-retablir">Valeur par défaut</button>
                   </div>
+                  <p class="fr-hint-text fr-mb-0" id="prix-aide"></p>
                 </div>
               </div>
               {% if cartes_presentes and not lecture_cartes %}
@@ -167,7 +179,7 @@
                 <div class="fr-fieldset__element fr-fieldset__element--inline-grow">
                   <div class="fr-input-group">
                     <label class="fr-label" for="remplissage">Taux de remplissage (%)</label>
-                    <input class="fr-input champ-param" type="number" id="remplissage" data-cle="Acces_ressource|Général|taux_remplissage" data-pct="1" min="0" max="100" step="1" value="85">
+                    <input class="fr-input champ-param" type="number" id="remplissage" data-cle="Acces_ressource|Général|taux_remplissage" data-pct="1" min="0" max="100" step="1" value="{{ (ref.valeur('Acces_ressource', 'Général', 'taux_remplissage', none, 0.85) * 100) | brut }}">
                   </div>
                 </div>
                 <div class="fr-fieldset__element">
@@ -341,9 +353,12 @@
           </div>
           <div class="fr-col-12 fr-col-md-6 fr-col-lg-3">
             <div class="indicateur">
-              <p class="indicateur__libelle">Investissements initiaux (CAPEX)</p>
-              <p class="indicateur__valeur"><span id="eco-capex" class="valeur-sourcee" tabindex="0" aria-describedby="eco-capex-tt">–</span> <span class="indicateur__unite">€</span></p>
+              <p class="indicateur__libelle">Investissement initial : reste à charge</p>
+              <p class="indicateur__valeur"><span id="eco-rac" class="valeur-sourcee" tabindex="0" aria-describedby="eco-rac-tt">–</span> <span class="indicateur__unite">€</span></p>
+              {{ m.infobulle('eco-rac-tt', 'Investissement total − subventions publiques (matériel d\'irrigation et accès à la ressource)') }}
+              <p class="indicateur__secondaire"><span id="eco-capex" class="valeur-sourcee" tabindex="0" aria-describedby="eco-capex-tt">–</span> € d'investissement total</p>
               {{ m.infobulle('eco-capex-tt', 'Matériel d\'irrigation + accès à la ressource, avant subvention') }}
+              <p class="indicateur__secondaire"><span id="eco-subv">–</span> € de subventions</p>
               <p class="indicateur__complement" id="eco-capex-cpl"></p>
             </div>
           </div>
@@ -400,7 +415,7 @@
             <div class="fr-collapse" id="acc-cultures">
               <p class="fr-text--sm">Valeurs utilisées lorsque la culture n'a pas de carte ou que « Référence » est choisi pour les rendements.</p>
               {{ m.table_debut('Valeurs par défaut des cultures') }}
-                <thead><tr><th scope="col">Culture</th><th scope="col" class="num">Rendement irrigué (q/ha)</th><th scope="col" class="num">Rendement pluvial (q/ha)</th><th scope="col" class="num">Besoin (mm)</th><th scope="col" class="num">Prix (€/t)</th><th scope="col">Carte</th></tr></thead>
+                <thead><tr><th scope="col">Culture</th><th scope="col" class="num">Rendement irrigué (q/ha)</th><th scope="col" class="num">Rendement pluvial (q/ha)</th><th scope="col" class="num">Besoin (mm)</th><th scope="col" class="num">Prix de marché (€/t)</th><th scope="col" class="num">Barème MASAA (€/t)</th><th scope="col">Carte</th></tr></thead>
                 <tbody>
                 {% for c in ref.cultures %}{% set pp = ref.params_objet('Cultures', c) %}
                 <tr><th scope="row">{{ c }}</th>
@@ -408,6 +423,7 @@
                   <td class="num">{{ m.valeur(pp.get('rdt_pluvial'), 'cu') }}</td>
                   <td class="num">{{ m.valeur(pp.get('besoin_irrigation'), 'cu') }}</td>
                   <td class="num">{{ m.valeur(pp.get('prix_vente'), 'cu') }}</td>
+                  <td class="num">{{ m.valeur(pp.get('prix_masaa'), 'cu') }}</td>
                   <td>{% if c in catalogue and catalogue[c].complet %}<span class="fr-badge fr-badge--sm fr-badge--blue-ecume">{{ catalogue[c].code }}</span>{% else %}–{% endif %}</td></tr>
                 {% endfor %}
                 </tbody>
@@ -471,56 +487,101 @@
         {% endif %}{% endfor %}
       </div>
 
-      {% for src in ref.sources if type_source(src) == 'forage' %}{% set pp = ref.params_objet('Acces_ressource', src) %}
-      <h3 class="fr-h6">Forage individuel : coût unitaire détaillé</h3>
-      {{ m.table_debut('Coût unitaire détaillé du forage individuel') }}
-        <thead><tr><th scope="col">Poste</th><th scope="col" class="num">Valeur unitaire</th><th scope="col">Unité</th><th scope="col" class="num">Montant (€)</th></tr></thead>
-        <tbody>
-          <tr><th scope="row">{{ pp.dossier_etude.libelle }}</th><td class="num">{{ m.valeur(pp.dossier_etude, 'fo') }}</td><td>€</td><td class="num">= valeur</td></tr>
-          <tr><th scope="row">{{ pp.raccordement_electrique.libelle }}</th><td class="num">{{ m.valeur(pp.raccordement_electrique, 'fo') }}</td><td>€</td><td class="num">= valeur</td></tr>
-          <tr><th scope="row">{{ pp.foration_ml.libelle }}</th><td class="num">{{ m.valeur(pp.foration_ml, 'fo') }}</td><td>€/m</td><td class="num">{{ m.derivee('d-forage-foration', derives['d-forage-foration'], 'euro', 'Coût au mètre × profondeur') }}</td></tr>
-          <tr><th scope="row">{{ pp.profondeur.libelle }}</th><td class="num">{{ m.valeur(pp.profondeur, 'fo') }}</td><td>m</td><td class="num">–</td></tr>
-          <tr><th scope="row">{{ pp.pompe_abri.libelle }}</th><td class="num">{{ m.valeur(pp.pompe_abri, 'fo') }}</td><td>€</td><td class="num">= valeur</td></tr>
-        </tbody>
-        <tfoot><tr><th scope="row" colspan="3">Coût total du forage équipé</th><td class="num">{{ m.derivee('d-forage-total', derives['d-forage-total'], 'euro', 'Somme des postes') }}</td></tr></tfoot>
-      {{ m.table_fin() }}
-      {% endfor %}
-
-      <h3 class="fr-h6 fr-mt-4w">Coûts par type de ressource</h3>
+      {# Un seul tableau : une ligne par poste de coût, regroupées par type d'accès.
+         Le réseau d'amenée (commun à tous les types) fait l'objet du second tableau. #}
+      {% set ordre_postes = ['dossier_etude', 'raccordement_electrique', 'foration_ml', 'profondeur', 'pompe_abri',
+                             'capex_station', 'capex_branchement', 'cout_stockage', 'part_remplissage_pompe',
+                             'part_fixe', 'part_volumetrique',
+                             'taux_subvention', 'duree_vie', 'duree_vie_pompe'] %}
+      {% set details = {
+        'dossier_etude': "Dossier de déclaration, étude hydrogéologique, abri (dalle et cabane).",
+        'raccordement_electrique': "Raccordement au réseau électrique (poste, ligne).",
+        'profondeur': "Profondeur de l'ouvrage, multiplie le coût au mètre.",
+        'pompe_abri': "Pompe immergée 50 ch / 50 m³/h, armoire, colonne, accessoires, montage et compteur ; amortie sur la durée de vie de la station.",
+        'capex_station': "Pompe de surface, crépine, génie civil, compteur.",
+        'cout_stockage': "Multiplié par la capacité de la retenue, dimensionnée sur le besoin (volume à prélever ÷ taux de remplissage, × adhérents si collective). La station de reprise vers la parcelle est réputée comprise.",
+        'part_fixe': "Abonnement du gestionnaire, multiplié par la surface.",
+        'taux_subvention': "Taux propre à ce type d'accès, appliqué à l'ouvrage et au réseau d'amenée."
+      } %}
+      <h3 class="fr-h6">Coûts d'accès par type de ressource</h3>
       {{ m.table_debut("Coûts d'accès par type de ressource", 'table-sources') }}
         <thead><tr>
-          <th scope="col">Ressource</th><th scope="col" class="num">Coût de stockage (€/m³)</th><th scope="col" class="num">Station ou branchement (€)</th>
-          <th scope="col" class="num">Part fixe (€/ha/an)</th><th scope="col" class="num">Part volumétrique (€/m³)</th><th scope="col" class="num">Frais supplémentaires (€/an)</th>
-          <th scope="col" class="num">Subvention publique (%)</th>
-          <th scope="col" class="num">Durée de vie (ans)</th><th scope="col" class="num">Taux d'amortissement annuel</th>
+          <th scope="col">Type d'accès</th><th scope="col" class="num">Coût</th><th scope="col">Unité</th><th scope="col">Détail du coût</th>
+        </tr></thead>
+        {% for src in ref.sources %}{% set pp = ref.params_objet('Acces_ressource', src) %}{% set s = src | slug %}{% set t = type_source(src) %}
+        {% set codes = ordre_postes | select('in', pp) | list %}
+        {% set nb = codes | length + (0 if pp.get('taux_subvention') else 1) + (1 if t == 'forage' else 0) %}
+        <tbody class="groupe-source">
+        {% for code in codes %}{% set p = pp[code] %}
+          <tr data-source="{{ src }}" data-type="{{ t }}">
+            {% if loop.first %}<th scope="rowgroup" rowspan="{{ nb }}">{{ src }}</th>{% endif %}
+            {% if code == 'duree_vie' %}
+            <td class="num"><span class="valeur-sourcee duree-vie-affichee" tabindex="0" data-defaut="{{ p.valeur | brut }}" aria-describedby="dv-acc-{{ s }}-tt">{{ p | valeur_param }}</span>{{ m.infobulle('dv-acc-' ~ s ~ '-tt', ref.infobulle(p)) }}</td>
+            <td>ans</td>
+            <td>Durée d'amortissement de l'ouvrage — taux d'amortissement annuel : {{ m.derivee('d-acc-' ~ s ~ '-taux', derives['d-acc-' ~ s ~ '-taux'], 'pct', 'Facteur d\'annualisation i(1+i)ⁿ / ((1+i)ⁿ − 1)') }}</td>
+            {% elif code == 'duree_vie_pompe' %}
+            <td class="num">{{ m.valeur(p, 'src') }}</td>
+            <td>ans</td>
+            <td>Durée d'amortissement de la station de pompage — taux d'amortissement annuel : {{ m.derivee('d-acc-' ~ s ~ '-taux-pompe', derives['d-acc-' ~ s ~ '-taux-pompe'], 'pct', 'Facteur d\'annualisation i(1+i)ⁿ / ((1+i)ⁿ − 1)') }}</td>
+            {% elif p.unite == '0/1' %}
+            <td class="num"><span class="valeur-sourcee" tabindex="0" aria-describedby="flag-{{ s }}-{{ code }}">{{ 'oui' if p.valeur else 'non' }}</span>{{ m.infobulle('flag-' ~ s ~ '-' ~ code, ref.infobulle(p)) }}</td>
+            <td>–</td>
+            <td>{{ details.get(code, p.libelle) }}</td>
+            {% else %}
+            <td class="num">{{ m.valeur(p, 'src') }}</td>
+            <td>{{ p.unite }}</td>
+            <td>
+              {%- if code == 'foration_ml' -%}
+                {{ p.libelle }} × profondeur = {{ m.derivee('d-forage-foration', derives['d-forage-foration'], 'euro', 'Coût au mètre × profondeur') }} €
+              {%- elif code == 'part_remplissage_pompe' -%}
+                {%- if p.valeur -%}Part du remplissage hivernal pompée (le reste vient du ruissellement et de la pluie) ; ce volume est ensuite repompé en été vers la parcelle. Énergie = (volume prélevé × (1 + part pompée)) × prix de l'énergie.
+                {%- else -%}Remplissage gravitaire par ruissellement et précipitations : pas d'énergie de remplissage, seule la reprise vers la parcelle est pompée.{%- endif -%}
+              {%- elif code == 'part_volumetrique' -%}
+                Multipliée par le volume prélevé.{% if t == 'asa' %} Eau livrée sous pression : comprend l'énergie de pompage et de mise en pression, ainsi que la redevance de l'agence de l'eau acquittée par le gestionnaire (ni énergie ni redevance facturées séparément).{% endif %}
+              {%- else -%}{{ details.get(code, p.libelle) }}{%- endif -%}
+            </td>
+            {% endif %}
+          </tr>
+        {% endfor %}
+        {% if not pp.get('taux_subvention') %}
+          <tr data-source="{{ src }}" data-type="{{ t }}">
+            <td class="num">–</td><td>%</td><td>Subvention : taux général (paramètre ci-dessus), appliqué à l'ouvrage et au réseau d'amenée.</td>
+          </tr>
+        {% endif %}
+        {% if t == 'forage' %}
+          <tr data-source="{{ src }}" data-type="{{ t }}" class="ligne-total">
+            <td class="num"><strong>{{ m.derivee('d-forage-total', derives['d-forage-total'], 'euro', 'Somme des postes du forage') }}</strong></td>
+            <td>€</td><td><strong>Total du forage équipé</strong> (dossier, étude et abri + raccordement + forage × profondeur + station de pompage), avant subvention.</td>
+          </tr>
+        {% endif %}
+        </tbody>
+        {% endfor %}
+      {{ m.table_fin() }}
+
+      <h3 class="fr-h6 fr-mt-4w">Réseau d'amenée entre la source et la parcelle</h3>
+      <div class="fr-grid-row fr-grid-row--gutters fr-mb-2w parametres-generaux">
+        {% for code in ['cout_tuyau_ml', 'duree_vie_reseau'] %}{% if ga.get(code) %}
+        <div class="fr-col-12 fr-col-md-4"><p class="fr-mb-1v fr-text--sm fr-text--bold">{{ ga[code].libelle }} ({{ ga[code].unite }})</p>{{ m.valeur(ga[code], 'res') }}</div>
+        {% endif %}{% endfor %}
+        <div class="fr-col-12 fr-col-md-4"><p class="fr-mb-1v fr-text--sm fr-text--bold">Taux d'amortissement annuel du réseau</p>{{ m.derivee('d-acc-reseau-taux', derives['d-acc-reseau-taux'], 'pct', 'Facteur d\'annualisation i(1+i)ⁿ / ((1+i)ⁿ − 1)') }}</div>
+      </div>
+      {{ m.table_debut("Réseau d'amenée par type d'accès", 'table-reseau') }}
+        <thead><tr>
+          <th scope="col">Type d'accès</th><th scope="col" class="num">Distance</th><th scope="col">Unité</th>
+          <th scope="col" class="num">Investissement (€)</th><th scope="col" class="num">Annuité nette de subvention (€/an)</th><th scope="col">Détail du coût</th>
         </tr></thead>
         <tbody>
         {% for src in ref.sources %}{% set pp = ref.params_objet('Acces_ressource', src) %}{% set s = src | slug %}
           <tr data-source="{{ src }}" data-type="{{ type_source(src) }}">
             <th scope="row">{{ src }}</th>
-            <td class="num">{{ m.valeur(pp.get('cout_stockage'), 'src') if pp.get('cout_stockage') else '–' }}</td>
-            <td class="num">{% if pp.get('capex_station') %}{{ m.valeur(pp.capex_station, 'src') }}{% elif pp.get('capex_branchement') %}{{ m.valeur(pp.capex_branchement, 'src') }}{% elif type_source(src) == 'forage' %}<span class="fr-text--xs">voir ci-dessus</span>{% else %}–{% endif %}</td>
-            <td class="num">{{ m.valeur(pp.get('part_fixe'), 'src') if pp.get('part_fixe') else '–' }}</td>
-            <td class="num">{{ m.valeur(pp.get('part_volumetrique'), 'src') if pp.get('part_volumetrique') else '–' }}</td>
-            <td class="num">{{ m.valeur(pp.get('frais_supplementaires'), 'src') if pp.get('frais_supplementaires') else '–' }}</td>
-            <td class="num">{% if pp.get('taux_subvention') %}{{ m.valeur(pp.taux_subvention, 'src') }}{% else %}<span class="fr-text--xs">défaut ci-dessus</span>{% endif %}</td>
-            <td class="num"><span class="valeur-sourcee duree-vie-affichee" tabindex="0" data-defaut="{{ pp.duree_vie.valeur | brut }}" aria-describedby="dv-acc-{{ s }}-tt">{{ pp.duree_vie | valeur_param }}</span>{{ m.infobulle('dv-acc-' ~ s ~ '-tt', ref.infobulle(pp.duree_vie)) }}</td>
-            <td class="num">{{ m.derivee('d-acc-' ~ s ~ '-taux', derives['d-acc-' ~ s ~ '-taux'], 'pct', 'Facteur d\'annualisation i(1+i)ⁿ / ((1+i)ⁿ − 1)') }}</td>
+            <td class="num">{{ m.valeur(pp.get('distance_amenee'), 'res') }}</td>
+            <td>m</td>
+            <td class="num">{{ m.derivee('d-res-' ~ s ~ '-capex', derives['d-res-' ~ s ~ '-capex'], 'euro', 'Distance × coût des tuyaux') }}</td>
+            <td class="num">{{ m.derivee('d-res-' ~ s ~ '-annuite', derives['d-res-' ~ s ~ '-annuite'], 'euro', 'Investissement × (1 − subvention) × taux d\'amortissement du réseau') }}</td>
+            <td>{% if pp.get('distance_amenee') and not pp.distance_amenee.valeur %}Eau livrée à une borne en bord de parcelle : pas de réseau d'amenée à la charge de l'exploitant.{% else %}Distance × coût des tuyaux (fourniture et pose), amorti sur la durée de vie du réseau.{% endif %}</td>
           </tr>
         {% endfor %}
         </tbody>
-      {{ m.table_fin() }}
-
-      <h3 class="fr-h6 fr-mt-4w">Réseau d'amenée entre la source et la parcelle</h3>
-      {{ m.table_debut("Réseau d'amenée") }}
-        <thead><tr><th scope="col">Paramètre</th><th scope="col" class="num">Valeur</th><th scope="col">Unité</th></tr></thead>
-        <tbody>
-          {% for code in ['cout_tuyau_ml', 'distance_source_parcelle', 'duree_vie_reseau'] %}{% if ga.get(code) %}
-          <tr><th scope="row">{{ ga[code].libelle }}</th><td class="num">{{ m.valeur(ga[code], 'res') }}</td><td>{{ ga[code].unite }}</td></tr>
-          {% endif %}{% endfor %}
-          <tr><th scope="row">Taux d'amortissement annuel du réseau</th><td class="num">{{ m.derivee('d-acc-reseau-taux', derives['d-acc-reseau-taux'], 'pct', 'Facteur d\'annualisation') }}</td><td>par an</td></tr>
-        </tbody>
-        <tfoot><tr><th scope="row">Investissement du réseau (avant subvention)</th><td class="num">{{ m.derivee('d-acc-reseau-capex', derives['d-acc-reseau-capex'], 'euro', 'Distance × coût des tuyaux') }}</td><td>€</td></tr></tfoot>
       {{ m.table_fin() }}
       {% with contexte='acces' %}{% include "_legende_annuite.html" %}{% endwith %}
     </div>
@@ -557,7 +618,7 @@
       <div class="fr-grid-row fr-grid-row--gutters fr-mb-2w parametres-generaux">
         <div class="fr-col-12 fr-col-md-6"><p class="fr-mb-1v fr-text--sm fr-text--bold">{{ ge.prix_energie_m3.libelle }} (€/m³)</p>{{ m.valeur(ge.prix_energie_m3, 'nrj') }}</div>
       </div>
-      <p class="fr-text--sm">Prix forfaitaire de l'énergie de pompage (CGEDD, 2020), commun à tous les équipements et à toutes les sources d'eau, et appliqué au volume prélevé (et, le cas échéant, au volume pompé pour remplir une retenue). Lorsque l'eau est livrée sous pression (réseau collectif, ASA), l'énergie est déjà comprise dans la part volumétrique de l'accès à la ressource et n'est pas facturée séparément : le coût réel pour la situation simulée est visible dans l'onglet Simulation.</p>
+      <p class="fr-text--sm">Prix forfaitaire de l'énergie de pompage (CGEDD, 2020), commun à tous les équipements et à toutes les sources d'eau, et appliqué au volume prélevé et, pour une retenue par pompage, au volume pompé en hiver pour la remplir (hors part apportée par la pluie ; nul pour une retenue collinaire, remplie par ruissellement). Lorsque l'eau est livrée sous pression par une ASA (réseau collectif), l'énergie est déjà comprise dans la part volumétrique de l'accès à la ressource et n'est pas facturée séparément : le coût réel pour la situation simulée est visible dans l'onglet Simulation.</p>
     </div>
 
     {# ===================================================================== #}
@@ -639,10 +700,13 @@
         <div class="fr-col-12 fr-col-md-6">
           <div class="methode__carte">
             <h4 class="fr-h6"><span class="pastille" style="background:{{ postes[4][2] }}"></span>Accès à la ressource</h4>
-            <p class="methode__formule"><code>Coût = annuité (ouvrage + réseau d'amenée) + part fixe × surface + part volumétrique × volume prélevé + frais supplémentaires</code></p>
-            <p class="fr-text--sm">Retenue : capacité = volume prélevé × nombre d'adhérents ÷ taux de remplissage, coût réparti entre adhérents. Forage : étude + raccordement électrique + foration × profondeur + pompe et abri.</p>
+            <p class="methode__formule"><code>Coût = annuité (ouvrage + réseau d'amenée) + part fixe × surface + part volumétrique × volume prélevé</code></p>
+            <p class="fr-text--sm">Forage et pompage en cours d'eau : ouvrage et pompe, puis réseau d'amenée jusqu'à la parcelle. Forage (Chambres d'agriculture France, 2025) : dossier, étude et abri + raccordement électrique + forage × profondeur, amortis sur 40 ans, et station de pompage amortie sur 20 ans. Retenue : capacité = volume prélevé × nombre d'adhérents ÷ taux de remplissage, coût réparti entre adhérents, puis réseau d'amenée. ASA : branchement, part fixe à l'hectare et part volumétrique ; l'eau est livrée sous pression en bord de parcelle (pas de réseau d'amenée par défaut) et l'énergie comme la redevance de l'agence, acquittées par le gestionnaire, sont comprises dans son tarif.</p>
+            <p class="fr-text--sm"><strong>Gouvernance des réseaux collectifs.</strong> Le type d'accès « ASA » représente tout réseau collectif d'irrigation sous pression, quel qu'en soit le gestionnaire : association syndicale autorisée (ASA) d'irrigants propriétaires du réseau, ou société d'aménagement régional et concessionnaire d'un canal (BRL, SCP, CACG…). Les deux appliquent la même tarification binomiale, part fixe à l'hectare ou au débit souscrit et part volumétrique (Favre &amp; Hardelin, 2025) ; ils ne se distinguent que par la gouvernance : décisions et investissements votés par les adhérents d'une ASA, qui en portent les emprunts, contre tarifs fixés par la société ou le concessionnaire dans le cadre de sa concession.</p>
+            <p class="fr-text--sm">Réseau d'amenée = distance propre au type d'accès × coût des tuyaux (fourniture et pose), amorti sur sa propre durée de vie.</p>
             <p class="fr-text--bold fr-mb-1v">Limites</p>
             <ul class="methode__limites">
+              <li>Retenues : la station de reprise (pompe entre la retenue et la parcelle) n'est pas chiffrée à part ; elle est réputée comprise dans le coût de construction au m³ stocké. Ordre de grandeur si elle ne l'est pas : pompe de surface 50 ch / 50 m³/h ≈ 25 000 €, amortie sur 20 ans (Chambres d'agriculture France, 2025).</li>
               <li>Coûts moyens, sans prise en compte du site (terrassement, géomembrane, profondeur de nappe).</li>
               <li>Entretien courant de l'ouvrage non compté.</li>
               <li>Volume supposé disponible chaque année (pas de risque de non-remplissage).</li>
@@ -653,13 +717,13 @@
         <div class="fr-col-12 fr-col-md-6">
           <div class="methode__carte">
             <h4 class="fr-h6"><span class="pastille" style="background:{{ postes[0][2] }}"></span>Énergie</h4>
-            <p class="methode__formule"><code>Coût = (volume prélevé + volume de remplissage d'une retenue) × prix forfaitaire (€/m³)</code></p>
-            <p class="fr-text--sm">Prix forfaitaire de 0,07 €/m³ (CGEDD, 2020). Nul si l'eau est livrée sous pression (réseau, ASA) : l'énergie est alors comprise dans la part volumétrique.</p>
+            <p class="methode__formule"><code>Coût = (volume prélevé + volume prélevé × part du remplissage pompée) × prix forfaitaire (€/m³)</code></p>
+            <p class="fr-text--sm">Prix forfaitaire de 0,07 €/m³ (CGEDD, 2020). Forage et cours d'eau : pompage vers la parcelle. Retenue par pompage : pompage de remplissage en hiver (hors part apportée par la pluie sur le plan d'eau), puis reprise vers la parcelle en été. Retenue collinaire : remplissage gravitaire par ruissellement et précipitations, seule la reprise vers la parcelle est pompée. Nul si l'eau est livrée sous pression par une ASA : l'énergie est alors comprise dans la part volumétrique.</p>
             <p class="fr-text--bold fr-mb-1v">Limites</p>
             <ul class="methode__limites">
-              <li>Prix identique quelle que soit la hauteur de pompage (forage profond ou pompage de surface).</li>
-              <li>Tarifs réels (heures creuses, photovoltaïque) et hausse depuis 2020 non pris en compte.</li>
-              <li>Remplissage compté aussi pour une retenue collinaire, alimentée sans pompage.</li>
+              <li>Prix identique quelle que soit la hauteur de pompage (forage profond, pompage de surface, remplissage à faible hauteur).</li>
+              <li>Tarifs réels (heures creuses, photovoltaïque) et hausse depuis 2020 non pris en compte ; Chambres d'agriculture France (2025) retiennent 0,118 €/m³ pour une station d'irrigation.</li>
+              <li>Évaporation et infiltration de la retenue non comptées dans le volume pompé.</li>
             </ul>
           </div>
         </div>
@@ -667,7 +731,7 @@
           <div class="methode__carte">
             <h4 class="fr-h6"><span class="pastille" style="background:{{ postes[1][2] }}"></span>Redevance agence de l'eau</h4>
             <p class="methode__formule"><code>Coût = volume prélevé × taux (c€/m³) ÷ 100</code></p>
-            <p class="fr-text--sm">Taux de l'agence selon la catégorie (1 hors ZRE, 2 en ZRE) et l'origine de l'eau (souterraine pour un forage, superficielle sinon). Due si le volume dépasse le seuil d'assujettissement ou si l'accès est collectif.</p>
+            <p class="fr-text--sm">Taux de l'agence selon la catégorie (1 hors ZRE, 2 en ZRE) et l'origine de l'eau (souterraine pour un forage, superficielle sinon). Due si le volume dépasse le seuil d'assujettissement ou si l'accès est collectif. ASA : acquittée par le gestionnaire et comprise dans son tarif, elle n'est pas ajoutée.</p>
             <p class="fr-text--bold fr-mb-1v">Limites</p>
             <ul class="methode__limites">
               <li>Agence déduite du département, pas du bassin versant exact.</li>
