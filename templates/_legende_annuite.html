@@ -8,7 +8,7 @@
       <p class="formule">Annuité = CAPEX × (1 − taux de subvention) × <em>a</em>
         &nbsp;&nbsp;avec&nbsp;&nbsp; <em>a</em> = <em>i</em> (1 + <em>i</em>)<sup><em>n</em></sup> / [(1 + <em>i</em>)<sup><em>n</em></sup> − 1]</p>
       <ul>
-        <li>taux de subvention : {% if contexte == 'acces' %}de l'ouvrage et du réseau d'amenée (nul par défaut pour le matériel){% else %}du matériel d'irrigation (nul par défaut){% endif %} ;</li>
+        <li>taux de subvention : {% if contexte == 'acces' %}de l'ouvrage et du réseau d'amenée, propre à chaque type d'accès (45 % pour le forage, taux général sinon){% else %}du matériel d'irrigation{% endif %} ;</li>
         <li><em>i</em> : taux d'actualisation ({% if contexte == 'acces' %}accès à la ressource{% else %}équipements{% endif %}) ;</li>
         <li><em>n</em> : durée de vie en années ;</li>
         <li><em>a</em> : facteur d'annualisation, appelé ici « taux d'amortissement annuel ». Si <em>i</em> = 0, <em>a</em> = 1/<em>n</em> (amortissement linéaire).</li>

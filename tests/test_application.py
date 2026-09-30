@@ -250,6 +250,17 @@ class TestMoteur(unittest.TestCase):
         self.assertEqual(simuler(REF, entrees(source="Retenue collinaire"), {}, AGRO)["redevance"]["origine"],
                          "superficielle")
 
+    def test_redevance_retenue_collinaire_categorie_1(self):
+        """Art. L213-10-9 : retenue collinaire taxée au tarif de catégorie 1, même en ZRE, pour toutes les agences."""
+        for agence in REF.agences:
+            zre = simuler(REF, entrees(source="Retenue collinaire", zre=True, agence=agence), {}, AGRO)
+            self.assertEqual(zre["redevance"]["categorie"], 1, agence)
+            self.assertEqual(zre["redevance"]["taux_c_m3"],
+                             REF.valeur("Ressources", agence, "cat1_superficielle"), agence)
+            self.assertEqual(zre["redevance"]["regle_retenue"], "collinaire")
+        # Le forage en ZRE reste en catégorie 2
+        self.assertEqual(simuler(REF, entrees(zre=True, agence="Loire-Bretagne"), {}, AGRO)["redevance"]["categorie"], 2)
+
     def test_retenue_collective(self):
         seul = simuler(REF, entrees(source="Retenue collinaire"), {}, AGRO)
         partage = simuler(REF, entrees(source="Retenue collinaire", type_retenue="collective",
@@ -294,7 +305,7 @@ class TestMoteur(unittest.TestCase):
     def test_forage_deux_durees_de_vie(self):
         """Forage (40 ans) et station de pompage (20 ans) sont amortis séparément (CDAF, 2025)."""
         e = entrees(source="Forage individuel")
-        cle_d = "Acces_ressource|Forage individuel|distance_amenee"
+        cle_d = "Acces_ressource|Général|distance_amenee"
         r = simuler(REF, e, {cle_d: 0}, AGRO)
         an = r["annualisation"]["acces"]
         pompe = REF.valeur("Acces_ressource", "Forage individuel", "pompe_abri")
@@ -305,8 +316,8 @@ class TestMoteur(unittest.TestCase):
         self.assertAlmostEqual(an["facteur_ouvrage"], facteur_annualisation(an["taux"], 40))
         self.assertAlmostEqual(an["capex_brut"], 87500)
 
-    def test_distance_amenee_par_source(self):
-        cle = "Acces_ressource|Forage individuel|distance_amenee"
+    def test_distance_amenee_commune(self):
+        cle = "Acces_ressource|Général|distance_amenee"
         pres = simuler(REF, entrees(), {cle: 100}, AGRO)
         loin = simuler(REF, entrees(), {cle: 1000}, AGRO)
         cout_ml = REF.valeur("Acces_ressource", "Général", "cout_tuyau_ml")
@@ -327,7 +338,7 @@ class TestMoteur(unittest.TestCase):
                 self.assertIn(f"d-eq-{slug(eq)}-{suffixe}", d)
         for src in REF.sources:
             self.assertIn(f"d-acc-{slug(src)}-taux", d)
-            self.assertIn(f"d-res-{slug(src)}-capex", d)
+        self.assertIn("d-res-capex", d)
         self.assertIn("d-forage-total", d)
         self.assertGreater(d["d-forage-total"], 0)
 

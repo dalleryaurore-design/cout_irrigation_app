@@ -101,7 +101,8 @@ d'environnement `IRRIG_COMMUNE_DEFAUT`, `IRRIG_DEPARTEMENT_DEFAUT`, `IRRIG_CULTU
   grille le plus proche du centre de la commune (horizon `IRRIG_HORIZON_CLIMAT`, H1 par
   défaut). En l'absence de Kc ou de donnée climatique, la valeur du référentiel s'applique.
   La lecture du classeur étant lente, un cache `climate_data.cache.npz` est créé à côté.
-- *Infrastructure d'accès existante, déjà amortie* : le capital est réputé remboursé.
+- *Infrastructure déjà amortie* (case à droite du titre « Source de l'eau ») et *Matériel
+  déjà amorti* (à droite du titre « Équipement ») : le capital est réputé remboursé.
   L'annuité et le CAPEX d'accès à la ressource tombent à zéro ; l'entretien, l'énergie,
   la redevance, la part fixe et la part volumétrique restent comptés.
 - *Retenue* : la capacité est dimensionnée sur le besoin (volume à prélever ÷ taux de
@@ -267,7 +268,7 @@ redevance    = volume prélevé × taux de l'agence (catégorie 1 ou 2, eaux sup
 équipement   = CAPEX × (1 − subvention) × a + maintenance
 main-d'œuvre = coût de main-d'œuvre de l'équipement (€/ha/an) × surface
 accès        = ouvrage × (1 − subvention) × a_ouvrage
-               + distance d'amenée (propre au type d'accès) × coût des tuyaux × (1 − subvention) × a_réseau
+               + distance d'amenée (commune, sauf ASA) × coût des tuyaux × (1 − subvention) × a_réseau
                + part fixe + part volumétrique
 
 a = i (1 + i)ⁿ / [(1 + i)ⁿ − 1]        facteur d'annualisation ; a = 1/n si i = 0
@@ -285,8 +286,10 @@ même tarification binomiale, seule la gouvernance diffère. L'énergie de mise 
 et la redevance de prélèvement, acquittées par le gestionnaire, sont réputées comprises
 dans son tarif et ne sont pas facturées séparément (règle appliquée d'office).
 Pour une retenue collective, la redevance est due par la structure quel que soit le
-volume individuel.
-L'eau de l'ASA est livrée en bord de parcelle : sa distance d'amenée vaut 0 par défaut.
+volume individuel. Pour une retenue collinaire, la redevance est due au tarif de
+catégorie 1 quelle que soit la localisation, y compris en ZRE (art. L213-10-9 du Code de
+l'environnement) ; le paramètre d'agence `retenue_hors_zre` ne vise que la retenue par pompage.
+L'eau de l'ASA est livrée en bord de parcelle : pas de réseau d'amenée. Pour les autres types d'accès, une distance unique (500 m par défaut) s'applique.
 Pour les retenues, la station de reprise vers la parcelle est réputée comprise dans le
 coût de construction au m³ stocké.
 

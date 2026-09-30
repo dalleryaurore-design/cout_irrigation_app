@@ -298,7 +298,6 @@
   /* Prix de vente : valeur du référentiel pour la culture choisie */
   /* Deux jeux de prix : prix de marché du référentiel, ou barème du prix assuré MASAA (assurance récolte) */
   var PRIX = PAGE.prix_cultures || {};
-  var LIBELLES_PRIX = { referentiel: "prix de marché du référentiel", masaa: "barème MASAA de l'assurance récolte 2026" };
 
   function sourcePrix() {
     var r = document.querySelector('input[name="source-prix"]:checked');
@@ -310,11 +309,6 @@
     var p = (PRIX[src] || {})[$("culture").value];
     if (p === undefined || p === null) { p = (PRIX.referentiel || {})[$("culture").value]; }
     if (p !== undefined && p !== null) { $("prix-vente").value = p; }
-    var aide = $("prix-aide");
-    if (aide) {
-      aide.textContent = "Valeur « " + LIBELLES_PRIX[src] + " » pour « " + $("culture").value + " » : " +
-        fmt(p, p !== undefined && p % 1 ? 1 : 0) + " €/t. Modifiable.";
-    }
   }
 
   /* ==========================================================================
@@ -629,7 +623,10 @@
           : r.due
           ? "Redevance due : " + euros(res.couts.postes.filter(function (p) { return p.cle === "redevance"; })[0].montant, 0) + "/an."
           : "Prélèvement inférieur au seuil d'assujettissement de " + fmt(r.seuil, 0) + " m³/an : redevance non due.") +
-        (r.regle_retenue ? " Retenue en ZRE : l'agence applique le taux hors ZRE au remplissage hivernal." : "")
+        (r.regle_retenue === "collinaire"
+          ? " Retenue collinaire : tarif de catégorie 1 quelle que soit la localisation, y compris en ZRE (art. L213-10-9 du Code de l'environnement)."
+          : r.regle_retenue === "pompage"
+          ? " Retenue par pompage en ZRE : l'agence applique le taux hors ZRE au remplissage hivernal." : "")
       : "Sélectionnez une commune pour déterminer l'agence de l'eau.");
 
     var an = res.annualisation;

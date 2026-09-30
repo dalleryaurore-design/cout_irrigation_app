@@ -227,7 +227,8 @@ def simuler(ref: Referentiel, e: Dict[str, Any], surcharges: Dict[str, Any], agr
     else:
         capex_ouvrage = 0.0
 
-    distance = V("Acces_ressource", source, "distance_amenee", 0)
+    # Réseau d'amenée : distance commune à tous les types d'accès, sauf l'ASA (borne en bord de parcelle)
+    distance = 0.0 if tsrc == "asa" else V("Acces_ressource", "Général", "distance_amenee", 0)
     capex_reseau = distance * V("Acces_ressource", "Général", "cout_tuyau_ml")
     if capex_reseau:
         detail_capex.append((f"Réseau d'amenée ({distance:,.0f} m)".replace(",", "\u202f"), capex_reseau))
@@ -260,9 +261,12 @@ def simuler(ref: Referentiel, e: Dict[str, Any], surcharges: Dict[str, Any], agr
     zre = bool(e.get("zre"))
     origine = "souterraine" if tsrc == "forage" else "superficielle"
     categorie = 2 if zre else 1
-    regle_retenue = False
-    if zre and tsrc.startswith("retenue") and V("Ressources", agence, "retenue_hors_zre", 0) >= 0.5:
-        categorie, regle_retenue = 1, True
+    regle_retenue = ""
+    if zre and tsrc == "retenue_collinaire":
+        # Art. L213-10-9 C. env. : irrigation depuis une retenue collinaire = tarif de catégorie 1, où qu'elle soit
+        categorie, regle_retenue = 1, "collinaire"
+    elif zre and tsrc == "retenue_pompage" and V("Ressources", agence, "retenue_hors_zre", 0) >= 0.5:
+        categorie, regle_retenue = 1, "pompage"
     taux_c = V("Ressources", agence, f"cat{categorie}_{origine}", 0.0) if agence else 0.0
     seuil = V("Ressources", agence, f"seuil_cat{categorie}", 7000.0) if agence else 7000.0
     redevance_due = (collectif or v_prel >= seuil) and bool(agence)
@@ -385,13 +389,8 @@ def valeurs_derivees(ref: Referentiel, surcharges: Dict[str, Any], e: Dict[str, 
                                    + V("Acces_ressource", src, "raccordement_electrique")
                                    + V("Acces_ressource", src, "pompe_abri"))
     a_res = facteur_annualisation(i_acc, V("Acces_ressource", "Général", "duree_vie_reseau", 30))
-    cout_ml = V("Acces_ressource", "Général", "cout_tuyau_ml")
-    subv_defaut = V("Acces_ressource", "Général", "taux_subvention", 0.7)
     d["d-acc-reseau-taux"] = a_res
-    for src in ref.sources:
-        s = slug(src)
-        capex = V("Acces_ressource", src, "distance_amenee", 0) * cout_ml
-        subv = max(min(V("Acces_ressource", src, "taux_subvention", subv_defaut), 1.0), 0.0)
-        d[f"d-res-{s}-capex"] = capex
-        d[f"d-res-{s}-annuite"] = capex * (1 - subv) * a_res
+    d["d-res-capex"] = (V("Acces_ressource", "Général", "distance_amenee", 0)
+                        * V("Acces_ressource", "Général", "cout_tuyau_ml"))
+    d["d-res-annuite"] = d["d-res-capex"] * a_res  # avant subvention (le taux dépend du type d'accès)
     return d

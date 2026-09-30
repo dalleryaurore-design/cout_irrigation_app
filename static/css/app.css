@@ -55,6 +55,10 @@
 
 .champ-cellule { display: inline-flex; align-items: center; gap: .25rem; }
 .champ-cellule .fr-input { width: 6.5rem; text-align: right; padding: .25rem .5rem; font-size: .875rem; height: auto; }
+/* Commentaire synthétique du tableau d'accès : champs modifiables intégrés au texte */
+.commentaire-acces { font-size: .8125rem; line-height: 1.6; }
+.commentaire-acces .champ-cellule .fr-input { width: 4.5rem; padding: .125rem .375rem; font-size: .8125rem; }
+#table-sources .ligne-reseau th, #table-sources .ligne-reseau td { border-top: 2px solid var(--border-default-grey); }
 .champ-suffixe { font-size: .75rem; color: var(--text-mention-grey); }
 .champ-avec-action { display: flex; align-items: flex-start; gap: .5rem; flex-wrap: wrap; }
 .champ-avec-action .fr-input { flex: 1 1 8rem; }
@@ -80,6 +84,16 @@
   border-left: .25rem solid var(--border-default-grey);
 }
 .indicateur__libelle { font-size: .875rem; color: var(--text-mention-grey); margin: 0 0 .25rem; }
+.indicateur__titre { font-size: 1.125rem; font-weight: 700; color: var(--text-title-grey); margin-bottom: .375rem; }
+
+/* Options secondaires (cases et boutons radio) en petit */
+.choix-discret .fr-label { font-size: .75rem; line-height: 1.25rem; }
+.choix-discret.fr-radio-group--sm input[type="radio"] + label { padding-left: 1.75rem; }
+
+/* Titre de bloc en gras avec une case à cocher discrète à droite */
+.fr-fieldset__legend.entete-bloc { display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: .25rem 1rem; width: 100%; font-weight: 700; }
+.entete-bloc .fr-checkbox-group { display: inline-block; font-weight: 400; margin: 0; }
 .indicateur__valeur { font-size: 1.5rem; font-weight: 700; margin: 0; line-height: 1.2; font-variant-numeric: tabular-nums; }
 .indicateur__unite { font-size: .875rem; font-weight: 400; color: var(--text-mention-grey); }
 .indicateur__secondaire { font-size: .9375rem; margin: .125rem 0 0; font-variant-numeric: tabular-nums; }
