@@ -246,15 +246,15 @@
                   <div class="fr-fieldset__element fr-fieldset__element--inline fr-fieldset__element--inline-grow">
                     <div class="fr-input-group">
                       <label class="fr-label" for="subvention-equipement">Matériel d'irrigation (%)</label>
-                      <input class="fr-input champ-param" type="number" id="subvention-equipement" data-cle="Equipement|Général|taux_subvention" data-pct="1"
-                             min="0" max="100" step="1" value="0" inputmode="decimal">
+                      <input class="fr-input champ-subvention" type="number" id="subvention-equipement"
+                             min="0" max="100" step="1" value="{{ subventions.equipement | brut }}" inputmode="decimal">
                     </div>
                   </div>
                   <div class="fr-fieldset__element fr-fieldset__element--inline fr-fieldset__element--inline-grow">
                     <div class="fr-input-group">
                       <label class="fr-label" for="subvention">Infrastructures d'accès à la ressource (%)</label>
-                      <input class="fr-input champ-param" type="number" id="subvention" data-cle="Acces_ressource|Général|taux_subvention" data-pct="1"
-                             min="0" max="100" step="1" value="70" inputmode="decimal">
+                      <input class="fr-input champ-subvention" type="number" id="subvention"
+                             min="0" max="100" step="1" value="{{ subventions.acces[ref.sources[0]] | brut }}" inputmode="decimal">
                     </div>
                   </div>
                 </fieldset>
@@ -365,7 +365,7 @@
             <div class="indicateur">
               <p class="indicateur__libelle">Gain lié à l'irrigation</p>
               <p class="indicateur__valeur"><span id="eco-gain" class="valeur-sourcee" tabindex="0" aria-describedby="eco-gain-tt">–</span> <span class="indicateur__unite">€/an</span></p>
-              {{ m.infobulle('eco-gain-tt', '(rendement irrigué − rendement pluvial) × prix de vente × surface') }}
+              {{ m.infobulle('eco-gain-tt', '(rendement irrigué − rendement pluvial) × 0,1 × prix de vente × surface') }}
               <p class="indicateur__complement" id="eco-gain-cpl"></p>
             </div>
           </div>
@@ -717,6 +717,7 @@
   'surface_unitaire': surface_unitaire,
   'duree_vie_equipements': duree_vie_equipements,
   'duree_vie_sources': duree_vie_sources,
+  'subventions': subventions,
   'cartes_completes': cartes_completes,
   'cartes_variables': cartes_variables,
   'fond_carte': fond_carte,
@@ -727,7 +728,7 @@
 {% block scripts %}
 <script src="{{ url_for('static', filename='vendor/leaflet/leaflet.js') }}"></script>
 <script src="{{ url_for('static', filename='vendor/chartjs/chart.umd.min.js') }}"></script>
-<script src="{{ url_for('static', filename='js/cascade.js') }}"></script>
-<script src="{{ url_for('static', filename='js/carte-commune.js') }}"></script>
-<script src="{{ url_for('static', filename='js/projet.js') }}"></script>
+<script src="{{ statique('js/cascade.js') }}"></script>
+<script src="{{ statique('js/carte-commune.js') }}"></script>
+<script src="{{ statique('js/projet.js') }}"></script>
 {% endblock %}

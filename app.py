@@ -43,7 +43,8 @@ from flask import Flask, abort, jsonify, redirect, render_template, request, sen
 
 import config
 from moteur import cartes, climat
-from moteur.calcul import POSTES, COULEUR_BILAN, COULEUR_GAIN, code_prix, simuler, valeurs_derivees, type_source
+from moteur.calcul import (POSTES, COULEUR_BILAN, COULEUR_GAIN, code_prix, simuler, taux_subvention_acces,
+                           type_source, valeurs_derivees)
 from moteur.referentiel import GestionnaireReferentiel, slug
 
 app = Flask(__name__)
@@ -130,8 +131,17 @@ def contexte():
         "date_referentiel": time.strftime("%d/%m/%Y %H:%M", time.localtime(ref.date_modification)),
         "erreur_referentiel": REF.derniere_erreur,
         "CULTURE_DEFAUT": config.CULTURE_DEFAUT, "COMMUNE_DEFAUT": config.COMMUNE_DEFAUT,
-        "DEPARTEMENT_DEFAUT": config.DEPARTEMENT_DEFAUT,
+        "DEPARTEMENT_DEFAUT": config.DEPARTEMENT_DEFAUT, "statique": statique,
     }
+
+
+def statique(fichier: str) -> str:
+    """URL d'un fichier statique suffixée de sa date de modification : le navigateur recharge la nouvelle version."""
+    try:
+        v = int(os.path.getmtime(os.path.join(app.static_folder, fichier)))
+    except OSError:
+        v = 0
+    return url_for("static", filename=fichier, v=v)
 
 
 # ---------------------------------------------------------------------------
@@ -157,6 +167,9 @@ def projet():
                         for eq in ref.equipements if ref.param("Equipement", eq, "surface_unitaire")}
     duree_vie_equipements = {eq: ref.valeur("Equipement", eq, "duree_vie") for eq in ref.equipements}
     duree_vie_sources = {s: ref.valeur("Acces_ressource", s, "duree_vie") for s in ref.sources}
+    # Taux de subvention par défaut (en %) pré-remplis dans l'onglet Simulation
+    subventions = {"equipement": round(100 * ref.valeur("Equipement", "Général", "taux_subvention", None, 0.0), 1),
+                   "acces": {s: round(100 * taux_subvention_acces(ref, {}, s), 1) for s in ref.sources}}
     # rasterio n'est sollicité que si des cartes complètes sont effectivement présentes.
     cartes_presentes = any(i["complet"] for i in cat.values())
     lecture_cartes = bool(config.LECTURE_CARTES and cartes_presentes and cartes.disponible())
@@ -166,6 +179,7 @@ def projet():
     return render_template("projet.html", page="projet", catalogue=cat, exemple=exemple, derives=derives,
                            prix_cultures=prix_cultures, surface_unitaire=surface_unitaire,
                            duree_vie_equipements=duree_vie_equipements, duree_vie_sources=duree_vie_sources,
+                           subventions=subventions,
                            cartes_completes=cartes_completes, cartes_variables=cartes_variables,
                            postes=POSTES, couleur_gain=COULEUR_GAIN, couleur_bilan=COULEUR_BILAN,
                            cartes_presentes=cartes_presentes, lecture_cartes=lecture_cartes,

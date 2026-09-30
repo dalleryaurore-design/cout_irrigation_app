@@ -230,6 +230,23 @@ class TestMoteur(unittest.TestCase):
         self.assertEqual(cout(sans_capex), 0.0)
         self.assertGreater(sans_capex["couts"]["total"], 0.0)
 
+    def test_subvention_saisie_dans_la_simulation(self):
+        """Les taux saisis sous « Subvention publique » priment, y compris sur le taux propre au forage."""
+        cout = lambda r: r["couts"]["total"]  # noqa: E731
+        for source in ("Forage individuel", "Retenue collinaire"):
+            r0 = simuler(REF, entrees(source=source, subvention_acces_pct=0), {}, AGRO)
+            r50 = simuler(REF, entrees(source=source, subvention_acces_pct=50), {}, AGRO)
+            self.assertAlmostEqual(r50["annualisation"]["acces"]["subvention"], 0.5, msg=source)
+            self.assertLess(cout(r50), cout(r0), source)
+            self.assertAlmostEqual(r50["bilan"]["total"], r50["gain"]["total"] - cout(r50))
+        m0 = simuler(REF, entrees(subvention_equipement_pct=0), {}, AGRO)
+        m100 = simuler(REF, entrees(subvention_equipement_pct=100), {}, AGRO)
+        self.assertAlmostEqual(m100["annualisation"]["equipement"]["subvention"], 1.0)  # pas de plafond caché
+        self.assertLess(cout(m100), cout(m0))
+        self.assertAlmostEqual(m100["capex"]["equipement_net"], 0.0)
+        # Sans saisie : taux du référentiel (45 % pour le forage)
+        self.assertAlmostEqual(simuler(REF, entrees(), {}, AGRO)["annualisation"]["acces"]["subvention"], 0.45)
+
     def test_subvention_par_defaut_selon_la_source(self):
         forage = simuler(REF, entrees(source="Forage individuel"), {}, AGRO)
         retenue = simuler(REF, entrees(source="Retenue collinaire"), {}, AGRO)

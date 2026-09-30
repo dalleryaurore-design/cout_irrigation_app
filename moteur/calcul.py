@@ -93,6 +93,23 @@ def _f(x, defaut=0.0) -> float:
         return defaut
 
 
+def taux_saisi(e: Dict[str, Any], cle: str) -> Optional[float]:
+    """Taux de subvention saisi dans l'onglet Simulation (en %), ramené entre 0 et 1 ; None s'il n'est pas saisi."""
+    v = e.get(cle)
+    if v is None or v == "":
+        return None
+    try:
+        return max(min(float(v) / 100.0, 1.0), 0.0)
+    except (TypeError, ValueError):
+        return None
+
+
+def taux_subvention_acces(ref: Referentiel, surcharges: Dict[str, Any], source: str) -> float:
+    """Taux par défaut de l'accès : taux propre au type d'accès (forage) ou, à défaut, taux général."""
+    defaut = ref.valeur("Acces_ressource", "Général", "taux_subvention", surcharges, 0.7)
+    return max(min(ref.valeur("Acces_ressource", source, "taux_subvention", surcharges, defaut), 1.0), 0.0)
+
+
 def cout_maintenance_ha(ref: Referentiel, surcharges: Dict[str, Any], equip: str) -> float:
     """Coût de maintenance annuel d'un équipement, ramené à l'hectare (€/ha/an).
 
@@ -163,7 +180,10 @@ def simuler(ref: Referentiel, e: Dict[str, Any], surcharges: Dict[str, Any], agr
     i_eq = V("Equipement", "Général", "taux_actualisation", 0.03)
     n_eq = V("Equipement", equip, "duree_vie", 15)
     a_eq = facteur_annualisation(i_eq, n_eq)
-    subv_eq = max(min(V("Equipement", "Général", "taux_subvention", 0.0), 1.0), 0.0)
+    # Le taux saisi dans l'onglet Simulation (« Subvention publique ») prime sur le référentiel
+    subv_eq = taux_saisi(e, "subvention_equipement_pct")
+    if subv_eq is None:
+        subv_eq = max(min(V("Equipement", "Général", "taux_subvention", 0.0), 1.0), 0.0)
     subvention_equip = capex_equip * subv_eq
     capex_equip_net = capex_equip - subvention_equip
     annuite_equip = capex_equip_net * a_eq
@@ -178,8 +198,9 @@ def simuler(ref: Referentiel, e: Dict[str, Any], surcharges: Dict[str, Any], agr
 
     # ============================ ACCÈS À LA RESSOURCE ====================
     remplissage = max(min(V("Acces_ressource", "Général", "taux_remplissage", 0.85), 1.0), 0.01)
-    subv_defaut = V("Acces_ressource", "Général", "taux_subvention", 0.7)
-    subv = max(min(V("Acces_ressource", source, "taux_subvention", subv_defaut), 1.0), 0.0)
+    subv = taux_saisi(e, "subvention_acces_pct")
+    if subv is None:
+        subv = taux_subvention_acces(ref, surcharges, source)
     i_acc = V("Acces_ressource", "Général", "taux_actualisation", 0.03)
     n_ouvrage = V("Acces_ressource", source, "duree_vie", 30)
     n_reseau = V("Acces_ressource", "Général", "duree_vie_reseau", 30)

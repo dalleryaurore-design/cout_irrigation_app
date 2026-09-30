@@ -195,8 +195,25 @@
       deja_amorti_equipement: $("deja-amorti-equipement").checked,
       nb_unites: (etat.nbUnitesManuel && $("nb-unites").value) ? parseInt($("nb-unites").value, 10) : null,
       prix_vente: parseFloat($("prix-vente").value) || null,
-      source_prix: sourcePrix()
+      source_prix: sourcePrix(),
+      subvention_equipement_pct: nombreOuNull($("subvention-equipement").value),
+      subvention_acces_pct: nombreOuNull($("subvention").value)
     };
+  }
+
+  function nombreOuNull(v) { var n = parseFloat(v); return isNaN(n) ? null : n; }
+
+  /* Subvention publique (onglet Simulation) : pré-remplie avec le taux par défaut du référentiel, propre au type
+     d'accès pour les infrastructures (45 % pour le forage, taux général sinon), tant qu'elle n'a pas été saisie. */
+  var SUBVENTIONS = PAGE.subventions || { equipement: 0, acces: {} };
+
+  function subventionsParDefaut(forcer) {
+    if (forcer || !etat.subvEquipementManuel) { $("subvention-equipement").value = SUBVENTIONS.equipement; }
+    var s = SUBVENTIONS.acces[$("source").value];
+    if ((forcer || !etat.subvAccesManuel) && s !== undefined) { $("subvention").value = s; }
+    if (forcer) { etat.subvEquipementManuel = etat.subvAccesManuel = false; }
+    $("subvention-equipement").classList.toggle("champ-param--modifie", !!etat.subvEquipementManuel);
+    $("subvention").classList.toggle("champ-param--modifie", !!etat.subvAccesManuel);
   }
 
   function surchargeDepuisChamp(champ) {
@@ -233,6 +250,7 @@
       if (majDureeVieBassineSim) { majDureeVieBassineSim(); }
       etat.nbUnitesManuel = false;
       prixParDefaut();
+      subventionsParDefaut(true);
       simuler();
     });
   }
@@ -264,11 +282,13 @@
       if (champNom) { champNom.textContent = nom || opts.nomGenerique; }
       var cle = opts.feuille + "|" + nom + "|" + "duree_vie";
       var actuelle = etat.surcharges[cle];
-      champValeur.value = actuelle !== undefined ? actuelle : "";
       var defaut = opts.defauts[nom];
+      /* La case affiche la valeur par défaut de l'objet tant qu'elle n'a pas été modifiée */
+      champValeur.value = actuelle !== undefined ? actuelle : (defaut !== undefined && defaut !== null ? defaut : "");
+      champValeur.classList.toggle("champ-param--modifie", actuelle !== undefined);
       if (aide) {
         aide.textContent = defaut !== undefined
-          ? "Valeur par défaut de « " + nom + " » : " + defaut + " ans. Laisser vide pour la conserver."
+          ? "Valeur par défaut de « " + nom + " » : " + defaut + " ans."
           : "";
       }
     }
@@ -279,8 +299,12 @@
       var cle = opts.feuille + "|" + nom + "|duree_vie";
       var brut = champValeur.value;
       var v = parseInt(brut, 10);
-      var actif = brut !== "" && !isNaN(v);
+      var defaut = opts.defauts[nom];
+      /* Une valeur égale au défaut (ou une case vidée) n'est pas une modification */
+      var actif = brut !== "" && !isNaN(v) && v !== defaut;
       if (actif) { etat.surcharges[cle] = v; } else { delete etat.surcharges[cle]; }
+      if (brut === "" && defaut !== undefined) { champValeur.value = defaut; }
+      champValeur.classList.toggle("champ-param--modifie", actif);
       var cellule = celluleDureeVie(nom);
       if (cellule) {
         cellule.textContent = actif ? String(v) : cellule.dataset.defaut;
@@ -499,8 +523,10 @@
     texte("eco-cout-m3", fmt(c.c_par_m3, 1));
     texte("eco-cout-ha", fmt(c.par_ha, 0));
     texte("eco-gain", fmt(res.gain.total, 0));
-    texte("eco-gain-cpl", fmt(res.gain.par_ha, 0) + " €/ha · " + fmtS(a.delta_rdt) + " q/ha × " +
-      fmtS(res.gain.prix) + " €/t");
+    /* Δ rendement (q/ha) → t/ha (× 0,1) × prix (€/t) = gain à l'hectare, × surface = gain annuel */
+    texte("eco-gain-cpl", fmtS(a.delta_rdt) + " q/ha = " + fmtS(a.delta_rdt * 0.1, 2) + " t/ha × " +
+      fmtS(res.gain.prix) + " €/t = " + fmt(res.gain.par_ha, 0) + " €/ha × " +
+      fmtS(res.entrees.surface) + " ha");
     texte("eco-gain-tt", "(rendement irrigué − rendement pluvial) × 0,1 × prix de vente × surface");
     texte("eco-rac", fmt(res.capex.reste_a_charge, 0));
     texte("eco-capex", fmt(res.capex.total, 0));
@@ -671,6 +697,7 @@
     prixParDefaut();
     $("surface").value = x.surface;
     $("source").value = x.source;
+    subventionsParDefaut(true);
     $("equipement").value = x.equipement;
     $("zre").checked = !!x.zre;
     if (x.retenue === "collective") {
@@ -733,6 +760,7 @@
     ["culture", "surface", "source", "equipement", "agence", "nb-adherents", "capacite", "prix-vente"]
       .forEach(function (id) {
         $(id).addEventListener("change", function () {
+          if (id === "source") { subventionsParDefaut(false); }
           if (id === "culture") {
             prixParDefaut();
             majEtatCasesCartesVariables();
@@ -756,6 +784,14 @@
     });
     $("nb-unites").addEventListener("change", function () { etat.nbUnitesManuel = true; planifier(); });
     $("prix-retablir").addEventListener("click", function () { prixParDefaut(); planifier(); });
+    /* Subvention publique saisie : prise en compte immédiate dans les coûts et le bilan */
+    [["subvention-equipement", "subvEquipementManuel"], ["subvention", "subvAccesManuel"]].forEach(function (c) {
+      $(c[0]).addEventListener("input", function () {
+        etat[c[1]] = $(c[0]).value !== "";
+        $(c[0]).classList.toggle("champ-param--modifie", etat[c[1]]);
+        planifier();
+      });
+    });
     document.querySelectorAll('input[name="source-prix"]').forEach(function (r) {
       r.addEventListener("change", function () { prixParDefaut(); planifier(); });
     });
@@ -773,6 +809,7 @@
     });
 
     prixParDefaut();
+    subventionsParDefaut(true);
     majBlocs();
     if (PAGE.exemple) { appliquerExemple(PAGE.exemple); } else { preselectionnerDefaut(PAGE.defaut); }
   });
