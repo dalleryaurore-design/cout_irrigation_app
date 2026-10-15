@@ -15,6 +15,18 @@
 .bloc-carte { position: sticky; top: 1rem; }
 .leaflet-container { font-family: inherit; background: var(--background-alt-grey); }
 .leaflet-container a { color: var(--text-action-high-blue-france); }
+/* Le DSFR dessine un soulignement sur tout [href]. Leaflet le recentre
+   (background-position: 50% 50%) : + et − deviennent des barres. */
+.leaflet-bar a {
+  --underline-img: none;
+  background-image: none;
+  color: var(--text-title-grey, #161616);
+}
+.leaflet-control-attribution a {
+  --underline-img: none;
+  background-image: none;
+}
+.leaflet-control-attribution a[target="_blank"]::after { content: none; }
 .contour-commune { transition: opacity .2s; }
 
 .legendes-cartes-variables {
