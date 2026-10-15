@@ -68,7 +68,6 @@ class Param:
     libelle: str
     valeur: Optional[float]
     unite: str
-    fiabilite: str
     variable: bool
     vmin: Optional[float]
     vmax: Optional[float]
@@ -161,7 +160,7 @@ class Referentiel:
     def en_json(self) -> Dict[str, Any]:
         """Version sérialisable pour l'interface."""
         return {
-            "params": {k: {"valeur": p.valeur, "unite": p.unite, "fiabilite": p.fiabilite,
+            "params": {k: {"valeur": p.valeur, "unite": p.unite,
                            "variable": p.variable, "min": p.vmin, "max": p.vmax, "libelle": p.libelle,
                            "infobulle": self.infobulle(p)} for k, p in self.params.items()},
             "cultures": self.cultures,
@@ -176,6 +175,22 @@ class Referentiel:
 # =============================================================================
 # Chargement
 # =============================================================================
+# Champs des feuilles de paramètres, reconnus au début de l'en-tête de colonne (sans accent ni
+# casse) : « Code paramètre » -> code, « Réf. (id) » -> ref, « Précision / commentaire » -> precision…
+CHAMPS_PARAMETRES = ("objet", "code", "libelle", "valeur", "unite", "variable", "min", "max", "ref", "precision")
+
+
+def _colonnes(entete) -> Dict[str, int]:
+    """Indice de chaque champ d'une feuille de paramètres, d'après la ligne d'en-tête."""
+    col: Dict[str, int] = {}
+    for j, titre in enumerate(entete or ()):
+        s = slug(titre) if titre is not None else ""
+        champ = next((c for c in CHAMPS_PARAMETRES if s.startswith(c)), None)
+        if champ and champ not in col:
+            col[champ] = j
+    return col
+
+
 def _lire(chemin: str) -> Referentiel:
     wb = load_workbook(chemin, data_only=True, read_only=True)
     ref = Referentiel(chemin=chemin, date_modification=os.path.getmtime(chemin))
@@ -189,25 +204,30 @@ def _lire(chemin: str) -> Referentiel:
                 id=_texte(ligne[0]), courte=_texte(ligne[1]), complete=_texte(ligne[2]),
                 url=_texte(ligne[3]) if len(ligne) > 3 else "")
 
-    # --- Paramètres (format long)
+    # --- Paramètres (format long). Les colonnes sont repérées par leur en-tête : ajouter,
+    # retirer ou déplacer une colonne du classeur ne décale pas la lecture.
     for feuille in FEUILLES_PARAMETRES:
         if feuille not in wb.sheetnames:
             ref.anomalies.append(f"Feuille « {feuille} » absente du référentiel.")
             continue
+        lignes = wb[feuille].iter_rows(values_only=True)
+        col = _colonnes(next(lignes, ()))
         ordre: List[str] = []
-        for i, ligne in enumerate(wb[feuille].iter_rows(min_row=2, values_only=True), start=2):
-            if not ligne or not _texte(ligne[0]) or not _texte(ligne[1]):
+        for i, ligne in enumerate(lignes, start=2):
+            def cell(nom):
+                j = col.get(nom)
+                return ligne[j] if j is not None and j < len(ligne) else None
+            if not ligne or not _texte(cell("objet")) or not _texte(cell("code")):
                 continue
-            objet, code = _texte(ligne[0]), _texte(ligne[1])
-            valeur = _nombre(ligne[3])
+            objet, code = _texte(cell("objet")), _texte(cell("code"))
+            valeur = _nombre(cell("valeur"))
             if valeur is None:
                 ref.anomalies.append(f"{feuille}, ligne {i} : valeur manquante ou non numérique ({objet} / {code}).")
-            fiab = _texte(ligne[5]).upper()[:1] or "E"
-            p = Param(feuille=feuille, objet=objet, code=code, libelle=_texte(ligne[2]) or code,
-                      valeur=valeur, unite=_texte(ligne[4]), fiabilite=fiab,
-                      variable=_texte(ligne[6]).lower() in ("oui", "o", "yes", "1", "vrai"),
-                      vmin=_nombre(ligne[7]), vmax=_nombre(ligne[8]), ref_id=_texte(ligne[9]),
-                      precision=_texte(ligne[10]) if len(ligne) > 10 else "")
+            p = Param(feuille=feuille, objet=objet, code=code, libelle=_texte(cell("libelle")) or code,
+                      valeur=valeur, unite=_texte(cell("unite")),
+                      variable=_texte(cell("variable")).lower() in ("oui", "o", "yes", "1", "vrai"),
+                      vmin=_nombre(cell("min")), vmax=_nombre(cell("max")), ref_id=_texte(cell("ref")),
+                      precision=_texte(cell("precision")))
             if p.ref_id and p.ref_id not in ref.references:
                 ref.anomalies.append(f"{feuille}, ligne {i} : référence « {p.ref_id} » absente de la feuille References.")
             ref.params[p.cle] = p

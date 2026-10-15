@@ -383,14 +383,14 @@ def valeurs_derivees(ref: Referentiel, surcharges: Dict[str, Any], e: Dict[str, 
     V = lambda f, o, c, d=0.0: ref.valeur(f, o, c, surcharges, d)  # noqa: E731
     d: Dict[str, float] = {}
     i_eq = V("Equipement", "Général", "taux_actualisation", 0.03)
-    subv_eq = max(min(V("Equipement", "Général", "taux_subvention", 0.0), 1.0), 0.0)
     for eq in ref.equipements:
         s = slug(eq)
         capex_ha = V("Equipement", eq, "capex_ha")
         a = facteur_annualisation(i_eq, V("Equipement", eq, "duree_vie", 15))
         maintenance_ha = cout_maintenance_ha(ref, surcharges, eq)
         mo_ha = V("Equipement", eq, "mo_eur_ha", 0.0)
-        annuite_ha = capex_ha * (1 - subv_eq) * a
+        # Annuité brute (avant subvention) : le taux saisi dans la simulation ne s'applique qu'au CAPEX
+        annuite_ha = capex_ha * a
         d[f"d-eq-{s}-maint"] = maintenance_ha
         d[f"d-eq-{s}-taux"] = a
         d[f"d-eq-{s}-annuite"] = annuite_ha

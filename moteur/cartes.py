@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Cartes du modèle agronomique (GeoTIFF à la maille 8 km)
-=======================================================
+Cartes du modèle MAELIA (GeoTIFF à la maille 8 km)
+==================================================
 Trois cartes par culture, déposées dans le dossier ``cartes`` :
 
     culture_<CODE>_irrigue_irr_<contexte>.tif   besoin en eau d'irrigation
@@ -48,6 +48,10 @@ VARIABLES = {
 
 FACTEURS_RDT = {"t/ha": 10.0, "q/ha": 1.0, "kg/ha": 0.01}
 FACTEURS_BESOIN = {"mm": 1.0, "m3/ha": 0.1}
+# Cartes de rendement exprimées en % du rendement potentiel (sorties AqYield de MAELIA :
+# rendement = effet du stress hydrique × rendement optimal de l'espèce). Le facteur de
+# conversion vers q/ha dépend alors de la culture : rendement potentiel ÷ 100.
+POURCENT = "%"
 
 # Côté maximal de l'échantillon décimé lu pour reconnaître l'unité d'un fichier.
 COTE_ECHANTILLON = 120
@@ -180,9 +184,11 @@ def _entete(chemin: str, mtime: float, crs_force: str) -> Dict[str, Any]:
         pas = max(1, int(max(src.height, src.width) / COTE_ECHANTILLON))
         forme = (max(1, src.height // pas), max(1, src.width // pas))
         echantillon = _nettoyer(src.read(1, out_shape=forme, masked=False), src.nodata)
+        # Unité inscrite dans les métadonnées du fichier (étiquette GDAL « UNITS »), si présente
+        unite_fichier = (src.tags(1).get("UNITS") or src.tags().get("UNITS") or src.units[0] or "").strip()
         return {"transform": src.transform, "crs": crs, "bounds": src.bounds, "nodata": src.nodata,
                 "hauteur": src.height, "largeur": src.width, "echantillon": echantillon,
-                "note_crs": note_crs, "fichier": os.path.basename(chemin)}
+                "note_crs": note_crs, "fichier": os.path.basename(chemin), "unite_fichier": unite_fichier}
 
 
 def entete(chemin: str, crs_force: str = "auto") -> Dict[str, Any]:
@@ -193,10 +199,15 @@ def entete(chemin: str, crs_force: str = "auto") -> Dict[str, Any]:
 # Unités
 # ---------------------------------------------------------------------------
 def _unite(declaree: str, echantillon: np.ndarray, facteurs: Dict[str, float], ancre: Optional[float],
-           defaut: str) -> Tuple[str, float, bool]:
-    """Renvoie (unité, facteur vers l'unité de l'application, unité déduite ?)."""
+           defaut: str, unite_fichier: str = "") -> Tuple[str, float, bool]:
+    """Renvoie (unité, facteur vers l'unité de l'application, unité déduite ?).
+
+    Ordre de priorité : unité déclarée dans la feuille Cartes, puis unité inscrite dans le
+    fichier, puis unité déduite de l'ordre de grandeur des valeurs (comparées à « ancre »)."""
     if declaree and declaree != "auto" and declaree in facteurs:
         return declaree, facteurs[declaree], False
+    if unite_fichier in facteurs:
+        return unite_fichier, facteurs[unite_fichier], False
     v = echantillon[np.isfinite(echantillon) & (echantillon > 0)]
     if v.size == 0 or not ancre or ancre <= 0:
         return defaut, facteurs[defaut], True
@@ -205,20 +216,75 @@ def _unite(declaree: str, echantillon: np.ndarray, facteurs: Dict[str, float], a
     return meilleure, facteurs[meilleure], True
 
 
-def unites_culture(ref, culture: str, info: Dict[str, Any]) -> Dict[str, Tuple[str, float, bool]]:
-    """Unité de chaque famille de cartes : déclarée dans le référentiel, sinon déduite."""
+# ---------------------------------------------------------------------------
+# Rendement potentiel (dénominateur des cartes de rendement en %)
+# ---------------------------------------------------------------------------
+_cache_especes: Dict[str, Any] = {}
+
+
+def rendements_optimaux(chemin: str) -> Dict[str, float]:
+    """RENDEMENT_OPTIMAL (t/ha) par code d'espèce MAELIA, lu dans especesCultivees.csv
+    (codes en minuscules ; « NA » et cases vides ignorés)."""
+    if not chemin or not os.path.exists(chemin):
+        return {}
+    mtime = os.path.getmtime(chemin)
+    if _cache_especes.get("cle") == (chemin, mtime):
+        return _cache_especes["valeurs"]
+    valeurs: Dict[str, float] = {}
+    entete_csv = None
+    with open(chemin, encoding="utf-8-sig", errors="replace") as fic:
+        for ligne in fic:
+            cases = [c.strip() for c in ligne.rstrip("\r\n").split(";")]
+            if entete_csv is None and cases and cases[0].upper() == "ESPECE":
+                entete_csv = [c.lower() for c in cases]
+            elif entete_csv and cases and cases[0].upper() == "RENDEMENT_OPTIMAL":
+                for code, v in zip(entete_csv[1:], cases[1:]):
+                    try:
+                        x = float(v.replace(",", "."))
+                    except ValueError:
+                        continue
+                    if x > 0:
+                        valeurs[code] = x
+                break
+    _cache_especes.update({"cle": (chemin, mtime), "valeurs": valeurs})
+    return valeurs
+
+
+def rendement_potentiel(ref, culture: str, info: Dict[str, Any], chemin_especes: str = "") -> Dict[str, Any]:
+    """Rendement potentiel (q/ha) de la culture : RENDEMENT_OPTIMAL de especesCultivees.csv
+    (t/ha × 10) pour le code de carte, sinon rendement irrigué du référentiel."""
+    code = (info.get("code") or "").lower()
+    opt = rendements_optimaux(chemin_especes).get(code)
+    if opt:
+        return {"valeur": opt * 10.0, "source": f"rendement optimal MAELIA de l'espèce « {info.get('code')} » "
+                                                 f"(especesCultivees.csv : {opt:g} t/ha)"}
+    v = ref.valeur("Cultures", culture, "rdt_irrigue")
+    p = ref.param("Cultures", culture, "rdt_irrigue")
+    r = ref.reference(p.ref_id) if p else None
+    return {"valeur": v, "source": "rendement irrigué du référentiel" + (f" {r.citation}" if r else "")}
+
+
+def unites_culture(ref, culture: str, info: Dict[str, Any],
+                   chemin_especes: str = "") -> Dict[str, Tuple[str, float, bool]]:
+    """Unité de chaque famille de cartes : déclarée dans le référentiel, inscrite dans le
+    fichier, sinon déduite. Pour des rendements en %, le facteur ramène au rendement potentiel."""
     f = info["fichiers"]
     out: Dict[str, Tuple[str, float, bool]] = {}
     if f.get("rdt_irrigue"):
         e = entete(f["rdt_irrigue"], info["crs"])
-        out["rdt"] = _unite(info["unite_rdt"], e["echantillon"], FACTEURS_RDT,
-                            ref.valeur("Cultures", culture, "rdt_irrigue"), "q/ha")
+        facteurs = dict(FACTEURS_RDT)
+        pot = rendement_potentiel(ref, culture, info, chemin_especes)
+        if pot["valeur"]:
+            facteurs[POURCENT] = pot["valeur"] / 100.0
+        out["rdt"] = _unite(info["unite_rdt"], e["echantillon"], facteurs,
+                            ref.valeur("Cultures", culture, "rdt_irrigue"), "q/ha", e["unite_fichier"])
+        out["potentiel"] = pot
     else:
         out["rdt"] = ("q/ha", 1.0, True)
     if f.get("besoin"):
         e = entete(f["besoin"], info["crs"])
         out["besoin"] = _unite(info["unite_besoin"], e["echantillon"], FACTEURS_BESOIN,
-                               ref.valeur("Cultures", culture, "besoin_irrigation"), "mm")
+                               ref.valeur("Cultures", culture, "besoin_irrigation"), "mm", e["unite_fichier"])
     else:
         out["besoin"] = ("mm", 1.0, True)
     return out
@@ -302,12 +368,12 @@ def _valeur_zone(chemin: str, e: Dict[str, Any], geometrie: Optional[dict],
 
 
 def extraire(ref, culture: str, info: Dict[str, Any], geometrie: Optional[dict],
-             lonlat: Optional[Tuple[float, float]]) -> Dict[str, Any]:
+             lonlat: Optional[Tuple[float, float]], chemin_especes: str = "") -> Dict[str, Any]:
     """Valeurs agronomiques communales, converties dans les unités de l'application (q/ha et mm)."""
     if not _charger_rasterio():
         raise RuntimeError(f"lecture des cartes indisponible : {_erreur_rio}")
-    unites = unites_culture(ref, culture, info)
-    sortie: Dict[str, Any] = {"notes": [], "brut": {}, "unites": {}}
+    unites = unites_culture(ref, culture, info, chemin_especes)
+    sortie: Dict[str, Any] = {"notes": [], "brut": {}, "unites": {}, "potentiel": unites.get("potentiel")}
     for var in VARIABLES:
         chemin = info["fichiers"].get(var)
         if not chemin:
@@ -317,7 +383,8 @@ def extraire(ref, culture: str, info: Dict[str, Any], geometrie: Optional[dict],
         z = _valeur_zone(chemin, e, geometrie, lonlat)
         u, fac, deduite = unites["besoin" if var == "besoin" else "rdt"]
         sortie["brut"][var] = {"valeur": z["valeur"], "fichier": e["fichier"], "n_mailles": z["n"],
-                               "methode": z["methode"], "unite_source": u, "unite_deduite": deduite}
+                               "methode": z["methode"], "unite_source": u, "unite_deduite": deduite,
+                               "facteur": fac}
         sortie[var] = None if z["valeur"] is None else z["valeur"] * fac
         sortie["unites"][var] = u
         if e["note_crs"] and e["note_crs"] not in sortie["notes"]:
@@ -396,7 +463,8 @@ def _encoder_png(rgba: np.ndarray) -> bytes:
         return bytes(mem.read())
 
 
-def carte_variable(ref, culture: str, info: Dict[str, Any], variable: str) -> Optional[Dict[str, Any]]:
+def carte_variable(ref, culture: str, info: Dict[str, Any], variable: str,
+                   chemin_especes: str = "") -> Optional[Dict[str, Any]]:
     """Image PNG (RGBA, EPSG:4326) d'une variable (rendement irrigué, rendement pluvial ou
     besoin en eau), prête à superposer sur la carte (bornes en [[sud, ouest], [nord, est]]).
 
@@ -409,13 +477,15 @@ def carte_variable(ref, culture: str, info: Dict[str, Any], variable: str) -> Op
     if not chemin:
         return None
 
-    cle = (culture, variable, os.path.getmtime(chemin), ref.date_modification)
+    especes_mtime = os.path.getmtime(chemin_especes) if chemin_especes and os.path.exists(chemin_especes) else 0
+    cle = (culture, variable, os.path.getmtime(chemin), ref.date_modification, especes_mtime)
     with _verrou_variable:
         if cle in _cache_variable:
             return _cache_variable[cle]
 
-    unites = unites_culture(ref, culture, info)
-    u, fac, _deduite = unites["besoin" if variable == "besoin" else "rdt"]
+    unites = unites_culture(ref, culture, info, chemin_especes)
+    _u, fac, _deduite = unites["besoin" if variable == "besoin" else "rdt"]
+    u = VARIABLES[variable]["unite"]   # valeurs converties dans l'unité de l'application (q/ha ou mm)
 
     dst_crs = "EPSG:4326"
     transform, width, height = _grille_destination(chemin, dst_crs)

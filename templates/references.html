@@ -20,24 +20,19 @@
       </ol>
     </div>
     <div class="fr-col-12 fr-col-lg-4">
-      <div class="fr-callout">
-        <h2 class="fr-callout__title fr-h6">Convention de fiabilité</h2>
-        <p class="fr-callout__text fr-text--sm">
-          <span class="fr-badge fr-badge--sm fr-badge--success fr-badge--no-icon">D</span> Documenté : chiffre publié par une source nommée.<br>
-          <span class="fr-badge fr-badge--sm fr-badge--info fr-badge--no-icon">C</span> Calculé à partir de données documentées.<br>
-          <span class="fr-badge fr-badge--sm fr-badge--warning fr-badge--no-icon">E</span> Estimé : ordre de grandeur, source secondaire ou hypothèse de travail.
-        </p>
-      </div>
       {% if ref.anomalies %}
-      <div class="fr-alert fr-alert--warning fr-alert--sm fr-mt-2w">
+      <div class="fr-alert fr-alert--warning fr-alert--sm">
         <p>{{ ref.anomalies | length }} anomalie(s) dans le référentiel : {{ ref.anomalies[:3] | join(' ; ') }}</p>
       </div>
       {% endif %}
     </div>
   </div>
 
-  <h2 class="fr-h3 fr-mt-6w" id="cartes">Cartes du modèle agronomique</h2>
-  <p class="fr-text--sm">Lorsqu'une culture dispose de ses trois cartes, les rendements et le besoin en eau de la
+  <h2 class="fr-h3 fr-mt-6w" id="cartes">Cartes du modèle MAELIA</h2>
+  <p class="fr-text--sm">Les cartes de besoin en eau et de rendements sont des simulations de la plateforme MAELIA
+    <a href="#ref-MODELE_CARTES">(Therond et al., 2014)</a>, version 1.4.31, dont le modèle de culture AqYield
+    <a href="#ref-AQYIELD_2015">(Constantin et al., 2015)</a> calcule le rendement comme le rendement optimal de
+    l'espèce réduit par le stress hydrique. Lorsqu'une culture dispose de ses trois cartes, les rendements et le besoin en eau de la
     simulation sont lus sur ces cartes : moyenne des mailles de 8 km qui touchent le contour de la commune. L'info-bulle
     du résultat indique le fichier, la méthode et le nombre de mailles retenues. À défaut, ce sont les valeurs par
     défaut du référentiel qui s'appliquent.</p>
@@ -69,8 +64,11 @@
     <section class="fr-accordion">
       <h3 class="fr-accordion__title"><button type="button" class="fr-accordion__btn" aria-expanded="false" aria-controls="m-agro">Bilan agronomique</button></h3>
       <div class="fr-collapse" id="m-agro">
-        <p>Les rendements irrigué et pluvial et le besoin en eau d'irrigation sont lus sur les cartes du modèle agronomique lorsque la culture en dispose : moyenne des mailles de 8 km qui touchent le contour de la commune. À défaut, les valeurs par défaut du référentiel sont utilisées.</p>
-        <p>Le besoin en eau d'irrigation peut être estimé selon trois méthodes, au choix sous le résultat : <strong>carte</strong> (modèle agronomique), <strong>SGPE</strong> (déficit hydrique mensuel, voir ci-dessous) ou <strong>référence</strong> (valeur par défaut du référentiel).</p>
+        <p>Les rendements irrigué et pluvial et le besoin en eau d'irrigation sont lus sur les cartes du modèle MAELIA lorsque la culture en dispose : moyenne des mailles de 8 km qui touchent le contour de la commune. À défaut, les valeurs par défaut du référentiel sont utilisées.</p>
+        <p>Les cartes de rendement donnent un <strong>pourcentage du rendement potentiel</strong> (dans MAELIA, modèle de culture AqYield : rendement = effet du stress hydrique × rendement optimal de l'espèce). Elles sont converties en q/ha :</p>
+        <p class="formule">Rendement (q/ha) = % de la carte ÷ 100 × rendement potentiel (q/ha)</p>
+        <p>Le rendement potentiel est le rendement optimal de l'espèce dans le fichier de paramètres de MAELIA (<code>especesCultivees.csv</code>, ligne RENDEMENT_OPTIMAL, en t/ha) lorsqu'il est renseigné ; à défaut, le rendement irrigué du référentiel. L'info-bulle du résultat précise le pourcentage lu et le potentiel retenu.</p>
+        <p>Le besoin en eau d'irrigation peut être estimé selon trois méthodes, au choix sous le résultat : <strong>SGPE</strong> (par défaut ; déficit hydrique mensuel, voir ci-dessous), <strong>carte</strong> (modèle MAELIA) ou <strong>référence</strong> (valeur par défaut du référentiel).</p>
         <p class="formule">Volume appliqué (m³) = besoin (mm) × 10 × surface (ha)<br>Volume prélevé (m³) = volume appliqué ÷ efficience d'application du matériel</p>
       </div>
     </section>
@@ -94,7 +92,7 @@
             (indices NORETPC et NORRR) issus de DRIAS <a href="#ref-DRIAS_2020">(Météo-France, 2020)</a> :
             jeu EURO-CORDEX 2020, modèle ALADIN63_CNRM-CM5, scénario RCP4.5 (émissions modérées).</li>
           <li><strong>Horizon.</strong> Horizon proche H1 (2021-2050), le plus cohérent avec la période 2020-2040
-            des cartes du modèle agronomique. Les horizons H2 (2041-2070) et H3 (2071-2100) sont disponibles dans
+            des cartes MAELIA. Les horizons H2 (2041-2070) et H3 (2071-2100) sont disponibles dans
             les données, mais ne sont pas utilisés dans la simulation.</li>
           <li><strong>Localisation.</strong> ETP et P sont celles du <strong>point de grille DRIAS (maille de 8 km)
             le plus proche du centre de la commune</strong>, et non une moyenne départementale. L'info-bulle du

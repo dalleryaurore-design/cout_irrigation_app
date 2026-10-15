@@ -53,9 +53,44 @@ class TestReferentiel(unittest.TestCase):
         manquantes = {p.ref_id for p in REF.params.values() if p.ref_id and p.ref_id not in REF.references}
         self.assertEqual(manquantes, set())
 
-    def test_fiabilite_renseignee(self):
-        for p in REF.params.values():
-            self.assertIn(p.fiabilite, ("D", "C", "E"), p.cle)
+    def test_colonnes_lues_par_entete(self):
+        # Colonnes repérées par leur en-tête : unité, variable, bornes et référence bien lues
+        p = REF.param("Cultures", "Maïs", "rdt_irrigue")
+        self.assertEqual(p.unite, "q/ha")
+        self.assertFalse(p.variable)
+        self.assertIsNotNone(p.vmax)
+        self.assertTrue(p.ref_id)
+        self.assertTrue(any(q.variable for q in REF.params.values()))
+
+    def test_rendements_cartes_en_pourcentage(self):
+        # Les cartes de rendement MAELIA sont en % du rendement potentiel : converties en q/ha
+        # (% × potentiel ÷ 100), bornées par le potentiel, et irrigué ≥ pluvial en moyenne.
+        cat = cartes.catalogue(REF, config.DOSSIER_CARTES)
+        info = cat.get("Maïs")
+        if not (info and info["complet"] and cartes.disponible()):
+            self.skipTest("cartes du maïs ou rasterio indisponibles sur ce poste")
+        u = cartes.unites_culture(REF, "Maïs", info, config.ESPECES_CULTIVEES)
+        self.assertEqual(u["rdt"][0], cartes.POURCENT)
+        pot = u["potentiel"]["valeur"]
+        x = cartes.extraire(REF, "Maïs", info, None, (1.44, 43.60), config.ESPECES_CULTIVEES)
+        for var in ("rdt_irrigue", "rdt_pluvial"):
+            self.assertAlmostEqual(x[var], x["brut"][var]["valeur"] * pot / 100.0, places=6)
+            self.assertLessEqual(x[var], pot + 1e-9)
+        self.assertGreaterEqual(x["rdt_irrigue"], x["rdt_pluvial"])
+
+    def test_rendement_optimal_especes(self):
+        # RENDEMENT_OPTIMAL (t/ha) de especesCultivees.csv prioritaire sur le référentiel
+        import tempfile
+        with tempfile.NamedTemporaryFile("w", suffix=".csv", delete=False, encoding="utf-8") as f:
+            f.write("ESPECE;maisT;BTH\nRENDEMENT_MOYEN;NA;NA\nRENDEMENT_OPTIMAL;13;NA\n")
+        try:
+            self.assertEqual(cartes.rendements_optimaux(f.name), {"maist": 13.0})
+            pot = cartes.rendement_potentiel(REF, "Maïs", {"code": "MAIST"}, f.name)
+            self.assertEqual(pot["valeur"], 130.0)
+            pot = cartes.rendement_potentiel(REF, "Blé tendre", {"code": "BTH"}, f.name)
+            self.assertEqual(pot["valeur"], REF.valeur("Cultures", "Blé tendre", "rdt_irrigue"))
+        finally:
+            os.unlink(f.name)
 
     def test_departements(self):
         # 96 départements métropolitains (Corse comprise) ; les DOM relèvent des offices de l'eau
@@ -211,6 +246,28 @@ class TestMoteur(unittest.TestCase):
         amorti_eq = simuler(REF, entrees(deja_amorti_equipement=True), {"Equipement|Général|taux_subvention": 0.4}, AGRO)
         self.assertEqual(amorti_eq["capex"]["subvention_equipement"], 0.0)
         self.assertEqual(amorti_eq["capex"]["equipement_net"], 0.0)
+
+    def test_subvention_equipement_hors_maintenance_et_main_oeuvre(self):
+        """La subvention ne porte que sur le CAPEX : maintenance et main-d'œuvre sont inchangées."""
+        sans = simuler(REF, entrees(subvention_equipement_pct=0), {}, AGRO)
+        avec = simuler(REF, entrees(subvention_equipement_pct=60), {}, AGRO)
+        self.assertAlmostEqual(sans["annualisation"]["equipement"]["maintenance"],
+                               avec["annualisation"]["equipement"]["maintenance"])
+        mo = lambda r: dict((p["cle"], p["montant"]) for p in r["couts"]["postes"])["main_oeuvre"]  # noqa: E731
+        self.assertAlmostEqual(mo(sans), mo(avec))
+        an = avec["annualisation"]["equipement"]
+        self.assertAlmostEqual(an["annuite"], an["capex"] * 0.4 * an["facteur"])
+
+    def test_annuite_brute_onglet_equipement(self):
+        """Le tableau de l'onglet Équipement affiche l'annuité brute, quel que soit le taux de subvention."""
+        for taux in (0.0, 0.4, 0.8):
+            d = valeurs_derivees(REF, {"Equipement|Général|taux_subvention": taux}, {"equipement": "Pivot"})
+            for eq in REF.equipements:
+                s = slug(eq)
+                capex_ha = REF.valeur("Equipement", eq, "capex_ha", {}, 0.0)
+                self.assertAlmostEqual(d[f"d-eq-{s}-annuite"], capex_ha * d[f"d-eq-{s}-taux"], msg=eq)
+                self.assertAlmostEqual(d[f"d-eq-{s}-total"], d[f"d-eq-{s}-annuite"] + d[f"d-eq-{s}-maint"]
+                                       + REF.valeur("Equipement", eq, "mo_eur_ha", {}, 0.0), msg=eq)
 
     def test_equipement_deja_amorti(self):
         neuf = simuler(REF, entrees(), {}, AGRO)

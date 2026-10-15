@@ -31,6 +31,14 @@
   function pct(v, dec) { return fmt(v * 100, dec === undefined ? 1 : dec) + " %"; }
   function texte(id, t) { var e = $(id); if (e) { e.textContent = t; } }
   function html(id, t) { var e = $(id); if (e) { e.innerHTML = t; } }
+  /* Info-bulle au survol d'une méthode (Carte, SGPE, Référence) : description de la
+     méthode, complétée du motif d'indisponibilité le cas échéant */
+  function aideMethode(radio, motif) {
+    var groupe = radio.closest(".fr-radio-group");
+    if (!groupe) { return; }
+    var aide = groupe.getAttribute("data-aide") || "";
+    groupe.title = motif ? motif + " " + aide : aide;
+  }
 
   /* ------------------------------------------------------- Export CSV générique */
   function texteCellule(cellule) {
@@ -179,7 +187,7 @@
     var retenue = document.querySelector('input[name="type-retenue"]:checked');
     var methode = document.querySelector('input[name="methode-besoin"]:checked');
     return {
-      methode_besoin: methode ? methode.value : "carte",
+      methode_besoin: methode ? methode.value : "sgpe",
       culture: $("culture").value,
       surface: parseFloat($("surface").value) || 0,
       source: $("source").value,
@@ -490,13 +498,26 @@
       radioCarte.checked = true;
       planifier();
     }
-    radioCarte.title = a.carte_disponible ? "" : "Pas de carte de rendement pour cette culture.";
+    aideMethode(radioCarte, a.carte_disponible ? "" : "Pas de carte de rendement pour cette culture.");
     var dispoMethodes = a.methodes_besoin || {};
     var indisponibles = [];
     document.querySelectorAll('input[name="methode-besoin"]').forEach(function (r) {
       r.disabled = dispoMethodes[r.value] === false;
       if (r.disabled) { indisponibles.push(r.value); }
+      aideMethode(r, r.disabled ? "Indisponible pour cette culture." : "");
     });
+    /* Besoin en eau : méthode cochée indisponible → bascule sur la première disponible
+       (SGPE, Carte, Référence), et retour à la méthode choisie dès qu'elle redevient disponible */
+    var cochee = document.querySelector('input[name="methode-besoin"]:checked');
+    if (cochee && cochee.disabled) {
+      etat.besoinChoisi = etat.besoinChoisi || cochee.value;
+      var repli = document.querySelector('input[name="methode-besoin"]:not(:disabled)');
+      if (repli) { repli.checked = true; planifier(); }
+    } else if (etat.besoinChoisi && dispoMethodes[etat.besoinChoisi] !== false) {
+      var choisi = etat.besoinChoisi;
+      etat.besoinChoisi = null;
+      if (!cochee || cochee.value !== choisi) { $("methode-besoin-" + choisi).checked = true; planifier(); }
+    }
     var culture = res.entrees.culture;
     texte("methode-besoin-aide", [
       indisponibles.indexOf("sgpe") >= 0
@@ -779,6 +800,7 @@
     document.querySelectorAll('input[name="type-retenue"], input[name="methode-besoin"], input[name="methode-rendement"]').forEach(function (r) {
       r.addEventListener("change", function () {
         if (r.name === "methode-rendement") { etat.rendementBascule = false; }
+        if (r.name === "methode-besoin") { etat.besoinChoisi = null; }
         planifier();
       });
     });

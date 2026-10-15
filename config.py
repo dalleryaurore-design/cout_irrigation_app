@@ -16,6 +16,12 @@ REFERENTIEL = os.environ.get("IRRIG_REFERENTIEL", os.path.join(RACINE, "referent
 # « cartes » (narratif jaune, RCP8.5, blé tendre seul) n'est plus utilisé par défaut.
 DOSSIER_CARTES = os.environ.get("IRRIG_CARTES", os.path.join(RACINE, "carte-violet"))
 
+# Paramètres des espèces du modèle MAELIA (une colonne par code de culture des cartes).
+# Sa ligne RENDEMENT_OPTIMAL (t/ha) donne le rendement potentiel auquel se rapportent les
+# cartes de rendement, exprimées en % de ce potentiel ; à défaut (NA), le rendement irrigué
+# du référentiel en tient lieu.
+ESPECES_CULTIVEES = os.environ.get("IRRIG_ESPECES", os.path.join(RACINE, "especesCultivees.csv"))
+
 # Données climatiques mensuelles (ETP, précipitations) de la méthode SGPE, et horizon
 # retenu : H1 (2021-2050, cohérent avec les cartes 2020-2040), H2 (2041-2070) ou H3 (2071-2100).
 CLIMAT = os.environ.get("IRRIG_CLIMAT", os.path.join(RACINE, "climate_data.xlsx"))

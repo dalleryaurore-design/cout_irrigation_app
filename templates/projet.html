@@ -265,17 +265,20 @@
 
         <div class="fr-col-12 fr-col-lg-6">
           <div class="bloc-carte">
-            <div class="fr-checkbox-group fr-checkbox-group--sm" id="cases-cartes-variables">
-              <input type="checkbox" id="carte-var-rdt_irrigue" class="carte-var-case" data-variable="rdt_irrigue">
-              <label class="fr-label" for="carte-var-rdt_irrigue">Rendement potentiel irrigué</label>
-            </div>
-            <div class="fr-checkbox-group fr-checkbox-group--sm">
-              <input type="checkbox" id="carte-var-rdt_pluvial" class="carte-var-case" data-variable="rdt_pluvial">
-              <label class="fr-label" for="carte-var-rdt_pluvial">Rendement potentiel pluvial (non irrigué)</label>
-            </div>
-            <div class="fr-checkbox-group fr-checkbox-group--sm fr-mb-1w">
-              <input type="checkbox" id="carte-var-besoin" class="carte-var-case" data-variable="besoin">
-              <label class="fr-label" for="carte-var-besoin">Besoin en eau d'irrigation</label>
+            <div class="cases-discretes fr-mb-1w" id="cases-cartes-variables">
+              <p class="cases-discretes__titre">Cartes de MAELIA</p>
+              <div class="fr-checkbox-group fr-checkbox-group--sm">
+                <input type="checkbox" id="carte-var-rdt_irrigue" class="carte-var-case" data-variable="rdt_irrigue">
+                <label class="fr-label" for="carte-var-rdt_irrigue">Rendement potentiel irrigué</label>
+              </div>
+              <div class="fr-checkbox-group fr-checkbox-group--sm">
+                <input type="checkbox" id="carte-var-rdt_pluvial" class="carte-var-case" data-variable="rdt_pluvial">
+                <label class="fr-label" for="carte-var-rdt_pluvial">Rendement potentiel pluvial (non irrigué)</label>
+              </div>
+              <div class="fr-checkbox-group fr-checkbox-group--sm">
+                <input type="checkbox" id="carte-var-besoin" class="carte-var-case" data-variable="besoin">
+                <label class="fr-label" for="carte-var-besoin">Besoin en eau d'irrigation</label>
+              </div>
             </div>
             <div id="carte-simulation" class="carte carte--simulation" role="region" aria-label="Carte de localisation de la commune"></div>
             <div id="legendes-cartes-variables" class="legendes-cartes-variables" hidden></div>
@@ -292,9 +295,11 @@
               <p class="indicateur__libelle indicateur__titre">Rendements</p>
               <fieldset class="fr-fieldset fr-mb-1w" id="methode-rendement" aria-labelledby="indicateur-rendements">
                 <legend class="fr-sr-only" id="indicateur-rendements">Source des rendements</legend>
-                {% for val, lib in [('reference', 'Référence'), ('carte', 'Carte')] %}
+                {% for val, lib, aide in [
+                     ('reference', 'Référence', "Rendements moyens par culture du référentiel (Agreste, instituts techniques…), identiques pour toutes les communes"),
+                     ('carte', 'Carte', "Simulations du modèle MAELIA : rendements irrigué et pluvial sur la commune (RCP4.5, narratif « violet » Explore2)")] %}
                 <div class="fr-fieldset__element fr-fieldset__element--inline fr-mb-0">
-                  <div class="fr-radio-group fr-radio-group--sm choix-discret">
+                  <div class="fr-radio-group fr-radio-group--sm choix-discret" title="{{ aide }}" data-aide="{{ aide }}">
                     <input type="radio" id="methode-rendement-{{ val }}" name="methode-rendement" value="{{ val }}" {% if val == 'carte' %}checked{% endif %}>
                     <label class="fr-label" for="methode-rendement-{{ val }}">{{ lib }}</label>
                   </div>
@@ -314,9 +319,12 @@
               {% if id == 'agro-besoin' %}
               <fieldset class="fr-fieldset fr-mb-1w" id="methode-besoin" aria-labelledby="leg-methode-besoin">
                 <legend class="fr-sr-only" id="leg-methode-besoin">Méthode d'estimation du besoin en eau</legend>
-                {% for val, lib in [('carte', 'Carte'), ('sgpe', 'SGPE'), ('reference', 'Référence')] %}
+                {% for val, lib, aide in [
+                     ('sgpe', 'SGPE', "Calcul BNI = Σ (ETP × Kc − P) sur les mois de culture ; ETP et pluie DRIAS (RCP4.5, 2021-2050) au point de grille le plus proche"),
+                     ('carte', 'Carte', "Simulations du modèle MAELIA : moyenne des mailles de 8 km touchant la commune (RCP4.5, narratif « violet » Explore2)"),
+                     ('reference', 'Référence', "Valeur moyenne par culture du référentiel (Agreste, Arvalis, DRAAF…), identique pour toutes les communes")] %}
                 <div class="fr-fieldset__element fr-fieldset__element--inline fr-mb-0">
-                  <div class="fr-radio-group fr-radio-group--sm choix-discret">
+                  <div class="fr-radio-group fr-radio-group--sm choix-discret" title="{{ aide }}" data-aide="{{ aide }}">
                     <input type="radio" id="methode-besoin-{{ val }}" name="methode-besoin" value="{{ val }}" {% if loop.first %}checked{% endif %}>
                     <label class="fr-label" for="methode-besoin-{{ val }}">{{ lib }}</label>
                   </div>
@@ -447,7 +455,7 @@
         <thead><tr>
           <th scope="col">Équipement</th><th scope="col" class="num">CAPEX (€/ha)</th>
           <th scope="col" class="num">Durée de vie (ans)</th><th scope="col" class="num">Taux d'amortissement annuel</th>
-          <th scope="col" class="num">Annuité (€/ha/an)</th>
+          <th scope="col" class="num">Annuité brute, avant subvention (€/ha/an)</th>
           <th scope="col" class="num">Coût main-d'œuvre (€/ha/an)</th>
           <th scope="col" class="num">Coût maintenance (€/ha/an)</th>
           <th scope="col" class="num">Coût annuel total (€/ha/an)</th>
@@ -460,16 +468,17 @@
             <td class="num">{{ m.valeur(pp.get('capex_ha'), 'eq') }}</td>
             <td class="num"><span class="valeur-sourcee duree-vie-affichee" tabindex="0" data-defaut="{{ pp.duree_vie.valeur | brut }}" aria-describedby="dv-eq-{{ s }}-tt">{{ pp.duree_vie | valeur_param }}</span>{{ m.infobulle('dv-eq-' ~ s ~ '-tt', ref.infobulle(pp.duree_vie)) }}</td>
             <td class="num">{{ m.derivee('d-eq-' ~ s ~ '-taux', derives['d-eq-' ~ s ~ '-taux'], 'pct', 'Facteur d\'annualisation i(1+i)ⁿ / ((1+i)ⁿ − 1)') }}</td>
-            <td class="num">{{ m.derivee('d-eq-' ~ s ~ '-annuite', derives['d-eq-' ~ s ~ '-annuite'], 'euro', 'CAPEX à l\'hectare × (1 − taux de subvention) × taux d\'amortissement annuel') }}</td>
+            <td class="num">{{ m.derivee('d-eq-' ~ s ~ '-annuite', derives['d-eq-' ~ s ~ '-annuite'], 'euro', 'CAPEX à l\'hectare × taux d\'amortissement annuel (avant subvention)') }}</td>
             <td class="num">{{ m.valeur(pp.get('mo_eur_ha'), 'eq') }}</td>
             <td class="num">{{ m.derivee('d-eq-' ~ s ~ '-maint', derives['d-eq-' ~ s ~ '-maint'], 'euro', 'CAPEX à l\'hectare × taux de maintenance') }}</td>
-            <td class="num">{{ m.derivee('d-eq-' ~ s ~ '-total', derives['d-eq-' ~ s ~ '-total'], 'euro', 'Annuité + coût de maintenance + coût de main-d\'œuvre, à l\'hectare') }}</td>
+            <td class="num">{{ m.derivee('d-eq-' ~ s ~ '-total', derives['d-eq-' ~ s ~ '-total'], 'euro', 'Annuité brute + coût de maintenance + coût de main-d\'œuvre, à l\'hectare, avant subvention') }}</td>
             <td class="num">{{ m.valeur(pp.get('efficience'), 'eq') }}</td>
           </tr>
         {% endfor %}
         </tbody>
       {{ m.table_fin() }}
       <p class="fr-text--xs texte-mention">Pour l'enrouleur, le pivot et la rampe, le CAPEX de la simulation est calculé par unité (nombre entier de machines, d'après le CAPEX unitaire et la surface par unité renseignés dans le référentiel) ; pour les autres équipements, par hectare.</p>
+      <p class="fr-text--xs texte-mention">Les annuités et coûts annuels de ce tableau sont bruts, avant toute subvention. Le taux de subvention choisi dans l'onglet Simulation (« Subvention publique ») ne s'applique qu'au CAPEX du matériel ; la maintenance et la main-d'œuvre n'en bénéficient pas.</p>
       {% with contexte='equipement' %}{% include "_legende_annuite.html" %}{% endwith %}
     </div>
 
@@ -587,8 +596,8 @@
       <h3 class="fr-h5 fr-mt-5w">1. Besoin en eau et volume prélevé</h3>
       <p>Le besoin en eau d'irrigation (mm) est estimé selon la méthode choisie :</p>
       <ul>
-        <li><strong>Carte</strong> : moyenne des mailles du modèle agronomique qui touchent la commune (scénario RCP4.5, narratif « violet » d'Explore2) ;</li>
-        <li><strong>SGPE</strong> : <code>Σ max(0, ETP × Kc − P)</code> sur les mois où la culture est en place (Kc &gt; 0), avec l'ETP et les pluies DRIAS (RCP4.5, 2021-2050) du point de grille le plus proche ;</li>
+        <li><strong>SGPE</strong> (par défaut) : <code>Σ max(0, ETP × Kc − P)</code> sur les mois où la culture est en place (Kc &gt; 0), avec l'ETP et les pluies DRIAS (RCP4.5, 2021-2050) du point de grille le plus proche ;</li>
+        <li><strong>Carte</strong> : moyenne des mailles du modèle MAELIA qui touchent la commune (scénario RCP4.5, narratif « violet » d'Explore2) ;</li>
         <li><strong>Référence</strong> : valeur moyenne du référentiel pour la culture.</li>
       </ul>
       <p class="methode__formule"><code>Volume prélevé (m³) = besoin (mm) × 10 × surface (ha) ÷ efficience du matériel</code></p>
@@ -602,6 +611,9 @@
 
       <h3 class="fr-h5 fr-mt-5w">2. Gain lié à l'irrigation</h3>
       <p class="methode__formule"><code>Gain (€/an) = (rendement irrigué − rendement pluvial) (q/ha) × 0,1 × prix de vente (€/t) × surface (ha)</code></p>
+      <p>Rendements « Carte » : les cartes MAELIA donnent un pourcentage du rendement potentiel, converti en q/ha
+        (<code>% ÷ 100 × rendement potentiel</code>). Le potentiel est le rendement optimal de l'espèce dans MAELIA
+        (<code>especesCultivees.csv</code>) s'il est renseigné, sinon le rendement irrigué du référentiel.</p>
       <p class="fr-text--bold fr-mb-1v">Limites</p>
       <ul class="methode__limites">
         <li>Prix de vente fixe : la volatilité des cours n'est pas représentée.</li>

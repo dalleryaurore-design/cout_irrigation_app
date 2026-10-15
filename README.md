@@ -94,8 +94,10 @@ d'environnement `IRRIG_COMMUNE_DEFAUT`, `IRRIG_DEPARTEMENT_DEFAUT`, `IRRIG_CULTU
 - *Utiliser les rendements par défaut du référentiel (sans carte)* : n'est actif que pour
   les cultures disposant de cartes ; permet de comparer la lecture cartographique aux
   valeurs par défaut.
-- *Méthode d'estimation* du besoin en eau (sous le résultat) : **Carte** (modèle
-  agronomique), **SGPE** ou **Référence** (valeur par défaut du référentiel). La méthode
+- *Méthode d'estimation* du besoin en eau (sous le résultat) : **SGPE** (par défaut),
+  **Carte** (modèle MAELIA) ou **Référence** (valeur par défaut du référentiel). Une
+  description de chaque méthode s'affiche au survol. Si la méthode cochée est indisponible
+  pour la culture, l'application bascule sur la suivante disponible. La méthode
   SGPE calcule Σ max(0, ETP × Kc − P) sur les mois où Kc > 0 : Kc mensuels du référentiel
   (codes `kc_01` à `kc_12`, feuille Cultures), ETP et P de `climate_data.xlsx` au point de
   grille le plus proche du centre de la commune (horizon `IRRIG_HORIZON_CLIMAT`, H1 par
@@ -136,16 +138,15 @@ d'environnement `IRRIG_COMMUNE_DEFAUT`, `IRRIG_DEPARTEMENT_DEFAUT`, `IRRIG_CULTU
 Les valeurs marquées « Variable » dans le référentiel sont des champs de saisie : leur
 modification s'applique immédiatement à la simulation et le champ se souligne en bleu.
 Le bouton « Rétablir les valeurs du référentiel » annule toutes les surcharges. Les
-cellules grisées avec le badge **C** sont calculées à partir des autres.
+cellules grisées sont calculées à partir des autres.
 
 Le tableau de l'onglet Équipement affiche, par équipement : CAPEX (€/ha), durée de vie,
-taux d'amortissement annuel, annuité (€/ha/an, nette de la subvention au matériel),
+taux d'amortissement annuel, annuité brute (€/ha/an, avant subvention),
 coût de main-d'œuvre (€/ha/an), coût de maintenance (€/ha/an), coût annuel total
-(€/ha/an, somme des trois précédents) et efficience d'application.
-
-Badges de fiabilité : **D** documenté (chiffre publié par une source nommée), **C**
-calculé à partir de données documentées, **E** estimé (ordre de grandeur, source
-secondaire ou hypothèse de travail).
+(€/ha/an, somme des trois précédents, avant subvention) et efficience d'application.
+La subvention au matériel n'est appliquée que dans la simulation, au seul CAPEX
+(taux saisi sous « Subvention publique ») ; la maintenance et la main-d'œuvre n'en
+bénéficient pas.
 
 ### Volet Exemples
 
@@ -153,7 +154,7 @@ Six situations types. Un clic ouvre le projet pré-rempli, modifiable ensuite.
 
 ### Volet Références
 
-Bibliographie complète au format APA, convention de fiabilité, méthode de calcul,
+Bibliographie complète au format APA, méthode de calcul,
 limites de lecture, et hypothèses des cartes (scénario RCP4.5 et narratif « violet »
 d'Explore2).
 
@@ -186,11 +187,13 @@ un bandeau d'avertissement s'affiche.
 
 ### Colonnes des feuilles de paramètres
 
-`Objet | Code paramètre | Libellé | Valeur | Unité | Fiabilité | Variable | Min | Max | Réf. | Précision`
+`Objet | Code paramètre | Libellé | Valeur | Unité | Variable | Min | Max | Réf. | Précision`
+
+Les colonnes sont repérées par leur en-tête (et non par leur position) : en ajouter ou en
+déplacer une ne perturbe pas la lecture.
 
 - **Valeur** : seule colonne à modifier couramment. Les pourcentages se saisissent en
   décimal (0,85 pour 85 %).
-- **Fiabilité** : `D`, `C` ou `E`.
 - **Variable** : `oui` rend le paramètre modifiable depuis l'interface, entre `Min` et `Max`.
 - **Réf.** : identifiant présent dans la feuille `References`. Une référence inconnue est
   signalée comme anomalie dans le volet Références.
@@ -228,11 +231,18 @@ mais n'est plus lu par défaut.
 
 Les trois fichiers d'une culture doivent être présents pour que la carte soit utilisée.
 
-**Unités.** Les colonnes `Unité rendement` et `Unité besoin` acceptent `auto`, `t/ha`,
-`q/ha`, `kg/ha`, `mm`, `m3/ha`. En mode `auto`, l'unité est déduite par comparaison avec
-la valeur de référence de la culture ; l'info-bulle du résultat indique alors
-« unité déduite ». **Confirmez les unités auprès du producteur des cartes avant tout
-usage en production** et renseignez-les explicitement.
+**Unités.** Les colonnes `Unité rendement` et `Unité besoin` acceptent `auto`, `%`, `t/ha`,
+`q/ha`, `kg/ha`, `mm`, `m3/ha`. En mode `auto`, l'unité inscrite dans le fichier
+(étiquette `UNITS` du GeoTIFF) est retenue ; à défaut, elle est déduite par comparaison
+avec la valeur de référence de la culture, et l'info-bulle indique « unité déduite ».
+
+**Rendements en %.** Les cartes de rendement MAELIA (`*_pot_*.tif`, `UNITS = %`) donnent
+un pourcentage du rendement potentiel (modèle AqYield : rendement = effet du stress
+hydrique × rendement optimal). Elles sont converties en q/ha :
+`rendement = % ÷ 100 × rendement potentiel`. Le rendement potentiel est la ligne
+`RENDEMENT_OPTIMAL` (t/ha) de `especesCultivees.csv` pour le code de la carte (colonne
+`maisT`, `BTH`…, comparaison insensible à la casse ; chemin modifiable par `IRRIG_ESPECES`),
+et à défaut le rendement irrigué de la feuille `Cultures`.
 
 **Système de coordonnées.** Il est lu dans le fichier. S'il est absent, il est deviné
 (WGS 84, Lambert-93, Lambert II étendu) et l'écart est signalé sous la carte ; la colonne
@@ -303,15 +313,15 @@ coût de construction au m³ stocké.
   agrumes, amandier, pommier) : le gain correspond à la quasi-totalité du produit, non à
   un différentiel d'optimisation. Le seuil de rentabilité se lit alors différemment.
 - **Redevances des agences de l'eau** : seules Loire-Bretagne et Seine-Normandie portent
-  des taux documentés [D]. Adour-Garonne est partiellement renseignée ; Artois-Picardie,
+  des taux documentés. Adour-Garonne est partiellement renseignée ; Artois-Picardie,
   Rhin-Meuse et Rhône-Méditerranée-Corse portent des valeurs alignées sur Loire-Bretagne,
-  taguées [E] et signalées « à remplacer ». À reprendre sur les délibérations 2025 des
+  signalées « à remplacer ». À reprendre sur les délibérations 2025 des
   agences avant tout usage en réunion.
 - **Taux de subvention** : 70 % par défaut, conformément à la commande. C'est un niveau
   élevé au regard des aides documentées (10 à 40 % du montant HT pour les agences et le
   PCAE). Le curseur permet de tester d'autres hypothèses.
 - **Rendements et prix** : documentés pour le maïs, les céréales à paille et la pomme de
-  terre ; estimés [E] pour la plupart des autres cultures. Les prix sont volatils et
+  terre ; estimés pour la plupart des autres cultures. Les prix sont volatils et
   doivent être actualisés.
 - **Coefficients des matériels** : issus d'un cas type de 30 ha de maïs (Lacroix et al.,
   2015). Le coût à l'hectare varie fortement avec la surface.

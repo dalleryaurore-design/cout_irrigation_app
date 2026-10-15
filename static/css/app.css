@@ -88,6 +88,11 @@
 
 /* Options secondaires (cases et boutons radio) en petit */
 .choix-discret .fr-label { font-size: .75rem; line-height: 1.25rem; }
+/* Cases des couches MAELIA au-dessus de la carte : petit titre et libellés réduits */
+.cases-discretes__titre { font-size: .75rem; line-height: 1rem; font-weight: 700; margin: 0 0 .25rem;
+  color: var(--text-mention-grey); }
+.cases-discretes .fr-checkbox-group { margin-bottom: 0; }
+.cases-discretes .fr-label { font-size: .75rem; line-height: 1.25rem; }
 .choix-discret.fr-radio-group--sm input[type="radio"] + label { padding-left: 1.75rem; }
 
 /* Titre de bloc en gras avec une case à cocher discrète à droite */

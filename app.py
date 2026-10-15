@@ -156,8 +156,9 @@ def accueil():
 def projet():
     ref = REF.get()
     cat = cartes.catalogue(ref, config.DOSSIER_CARTES)
+    # Sans paramètre, la simulation s'ouvre sur l'exemple 1 (maïs) ; ?exemple=0 donne un formulaire vierge.
     exemple = None
-    n = request.args.get("exemple", type=int)
+    n = request.args.get("exemple", default=1, type=int)
     if n:
         exemple = next((x for x in ref.exemples if x["id"] == n), None)
     derives = valeurs_derivees(ref, {}, {"equipement": ref.equipements[0] if ref.equipements else ""})
@@ -216,7 +217,7 @@ def _valeurs_agro(ref, e, commune):
     cat = cartes.catalogue(ref, config.DOSSIER_CARTES)
     info = cat.get(culture)
     carte_dispo = bool(config.LECTURE_CARTES and info and info["complet"] and cartes.disponible())
-    methode = e.get("methode_besoin") if e.get("methode_besoin") in METHODES_BESOIN else "carte"
+    methode = e.get("methode_besoin") if e.get("methode_besoin") in METHODES_BESOIN else "sgpe"
     rdt_carte = carte_dispo and not e.get("sans_carte", False)
     utiliser = rdt_carte or (carte_dispo and methode == "carte")
     lonlat = tuple(commune["centre"]) if commune and commune.get("centre") else None
@@ -230,12 +231,14 @@ def _valeurs_agro(ref, e, commune):
         if lonlat is None and geom is None:
             agro["notes"].append("Sélectionnez une commune pour lire les cartes : valeurs du référentiel utilisées.")
         else:
+            especes = config.ESPECES_CULTIVEES
             cle = (culture, (commune or {}).get("code"), lonlat,
-                   tuple(os.path.getmtime(f) for f in info["fichiers"].values() if f), ref.date_modification)
+                   tuple(os.path.getmtime(f) for f in info["fichiers"].values() if f), ref.date_modification,
+                   os.path.getmtime(especes) if os.path.exists(especes) else 0)
             extr = _cache_extraction.get(cle)
             if extr is None:
                 try:
-                    extr = cartes.extraire(ref, culture, info, geom, lonlat)
+                    extr = cartes.extraire(ref, culture, info, geom, lonlat, especes)
                 except Exception as exc:
                     agro["notes"].append(f"Lecture des cartes impossible ({exc}) : valeurs du référentiel utilisées.")
                     extr = None
@@ -245,7 +248,9 @@ def _valeurs_agro(ref, e, commune):
                         _cache_extraction.popitem(last=False)
     corresp = {"rdt_irrigue": "rdt_irrigue", "rdt_pluvial": "rdt_pluvial", "besoin_mm": "besoin_irrigation"}
     cle_carte = {"rdt_irrigue": "rdt_irrigue", "rdt_pluvial": "rdt_pluvial", "besoin_mm": "besoin"}
-    ref_carte = ref.reference("MODELE_CARTES")
+    ref_carte, ref_aqyield = ref.reference("MODELE_CARTES"), ref.reference("AQYIELD_2015")
+    citation_cartes = ("MAELIA " + (ref_carte.citation if ref_carte else "")
+                       + (", modèle de culture AqYield " + ref_aqyield.citation if ref_aqyield else "")).strip()
     for champ, code in corresp.items():
         p = ref.param("Cultures", culture, code)
         v_ref = ref.valeur("Cultures", culture, code, e.get("surcharges"))
@@ -271,10 +276,15 @@ def _valeurs_agro(ref, e, commune):
         if depuis_carte and extr is not None and extr.get(cle_carte[champ]) is not None:
             v = extr[cle_carte[champ]]
             b = extr["brut"][cle_carte[champ]]
-            u = b["unite_source"] + (" (unité déduite)" if b["unite_deduite"] else "")
-            agro["infobulles"][champ] = (f"{ref_carte.citation if ref_carte else '(Modèle agronomique)'} · "
+            if b["unite_source"] == cartes.POURCENT:
+                pot = extr.get("potentiel") or {}
+                conversion = (f"{b['valeur']:.1f} % du rendement potentiel × {pot.get('valeur', 0):.0f} q/ha "
+                              f"({pot.get('source', '')})")
+            else:
+                conversion = "unité source " + b["unite_source"] + (" (unité déduite)" if b["unite_deduite"] else "")
+            agro["infobulles"][champ] = (f"{citation_cartes} · "
                                          f"{info['scenario'] or 'carte'} — {b['methode']} ({b['n_mailles']} maille(s)) ; "
-                                         f"fichier {b['fichier']} ; unité source {u}")
+                                         f"fichier {b['fichier']} ; {conversion}")
             agro["brut"][champ] = b
             if champ == "besoin_mm":
                 agro["methode_besoin"] = "carte"
@@ -346,7 +356,7 @@ def api_carte_variable(culture, variable):
     if not info or not (config.LECTURE_CARTES and cartes.disponible()):
         return jsonify({"disponible": False})
     try:
-        donnee = cartes.carte_variable(ref, culture, info, variable)
+        donnee = cartes.carte_variable(ref, culture, info, variable, config.ESPECES_CULTIVEES)
     except Exception as exc:
         return jsonify({"disponible": False, "erreur": str(exc)})
     if donnee is None:
