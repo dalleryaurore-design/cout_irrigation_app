@@ -58,7 +58,7 @@ COTE_ECHANTILLON = 120
 # Marge, en mailles, ajoutée autour de l'emprise de la commune.
 MARGE_MAILLES = 2
 
-_verrou = threading.Lock()
+_verrou = threading.RLock()
 _rio: Dict[str, Any] = {}          # fonctions rasterio chargées à la demande
 _erreur_rio = ""
 
@@ -76,8 +76,14 @@ def _charger_rasterio() -> bool:
     with _verrou:
         if _rio:
             return True
+        os.environ["PROJ_NETWORK"] = "OFF"
         try:
             import rasterio
+            try:
+                from pyproj import network
+                network.set_network_enabled(False)
+            except Exception:
+                pass
             from rasterio.crs import CRS
             from rasterio.features import geometry_mask
             from rasterio.io import MemoryFile
@@ -372,6 +378,14 @@ def extraire(ref, culture: str, info: Dict[str, Any], geometrie: Optional[dict],
     """Valeurs agronomiques communales, converties dans les unités de l'application (q/ha et mm)."""
     if not _charger_rasterio():
         raise RuntimeError(f"lecture des cartes indisponible : {_erreur_rio}")
+    # GDAL n'est pas thread-safe : deux simulations en parallèle peuvent se bloquer
+    # définitivement. Un seul process Gunicorn ne s'en remet pas.
+    with _verrou:
+        return _extraire_ouvert(ref, culture, info, geometrie, lonlat, chemin_especes)
+
+
+def _extraire_ouvert(ref, culture: str, info: Dict[str, Any], geometrie: Optional[dict],
+                     lonlat: Optional[Tuple[float, float]], chemin_especes: str = "") -> Dict[str, Any]:
     unites = unites_culture(ref, culture, info, chemin_especes)
     sortie: Dict[str, Any] = {"notes": [], "brut": {}, "unites": {}, "potentiel": unites.get("potentiel")}
     for var in VARIABLES:
@@ -483,6 +497,12 @@ def carte_variable(ref, culture: str, info: Dict[str, Any], variable: str,
         if cle in _cache_variable:
             return _cache_variable[cle]
 
+    with _verrou:
+        return _carte_variable_ouverte(ref, culture, info, variable, chemin, chemin_especes, cle)
+
+
+def _carte_variable_ouverte(ref, culture: str, info: Dict[str, Any], variable: str,
+                            chemin: str, chemin_especes: str, cle: tuple) -> Dict[str, Any]:
     unites = unites_culture(ref, culture, info, chemin_especes)
     _u, fac, _deduite = unites["besoin" if variable == "besoin" else "rdt"]
     u = VARIABLES[variable]["unite"]   # valeurs converties dans l'unité de l'application (q/ha ou mm)

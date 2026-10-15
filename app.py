@@ -30,6 +30,13 @@ RACINE_APP = os.path.dirname(os.path.abspath(__file__))
 if RACINE_APP not in sys.path:
     sys.path.insert(0, RACINE_APP)
 
+# PROJ télécharge parfois une grille Lambert-93 au premier calcul de carte.
+# Sur Render cet appel réseau ne revient pas : le thread meurt, et avec un seul
+# process les autres requêtes finissent par ne plus avoir de thread libre.
+os.environ["PROJ_NETWORK"] = "OFF"
+os.environ.setdefault("GDAL_HTTP_TIMEOUT", "5")
+os.environ.setdefault("GDAL_HTTP_CONNECTTIMEOUT", "3")
+
 if not os.path.exists(os.path.join(RACINE_APP, "config.py")):
     raise SystemExit(
         "Fichier « config.py » introuvable dans " + RACINE_APP + ".\n"

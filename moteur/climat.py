@@ -80,6 +80,16 @@ def _empreinte(chemin: str) -> str:
     return h.hexdigest()
 
 
+def _empreinte_stockee(z) -> str:
+    """Empreinte lue dans le npz. ``.item()`` évite qu'un scalaire NumPy ne se compare pas à la chaîne."""
+    if "empreinte" not in z.files:
+        return ""
+    brut = z["empreinte"]
+    if getattr(brut, "shape", None) == ():
+        brut = brut.item()
+    return str(brut).strip()
+
+
 def _charger(chemin: str) -> Optional[Dict[str, Any]]:
     """Données climatiques en mémoire (depuis le cache .npz si le contenu n'a pas changé)."""
     if not chemin or not os.path.exists(chemin):
@@ -94,11 +104,13 @@ def _charger(chemin: str) -> Optional[Dict[str, Any]]:
         if os.path.exists(cache):
             try:
                 with np.load(cache) as z:
-                    if "empreinte" in z.files and str(z["empreinte"]) == empreinte:
-                        d = {k: z[k] for k in ("coords", "pluie", "etp", "ids")}
-            except Exception:
+                    if _empreinte_stockee(z) == empreinte:
+                        d = {k: np.array(z[k]) for k in ("coords", "pluie", "etp", "ids")}
+            except Exception as exc:
+                print(f"climat: cache illisible ({exc})", flush=True)
                 d = None
         if d is None:
+            print("climat: lecture du classeur (cache absent ou périmé)", flush=True)
             d = _lire_classeur(chemin)
             try:
                 np.savez_compressed(cache, empreinte=np.array(empreinte), **d)
@@ -111,8 +123,17 @@ def _charger(chemin: str) -> Optional[Dict[str, Any]]:
 
 
 def prechauffer(chemin: str) -> None:
-    """Charge les données en arrière-plan pour que la première simulation reste rapide."""
-    threading.Thread(target=lambda: _charger(chemin), daemon=True).start()
+    """Charge le cache avant d'accepter des requêtes.
+
+    Un thread en arrière-plan relisait le classeur en tenant le verrou : la première
+    simulation attendait, et le seul process ne répondait plus à rien.
+    """
+    try:
+        d = _charger(chemin)
+        n = 0 if not d else len(d.get("coords", ()))
+        print(f"climat prêt ({n} points)", flush=True)
+    except Exception as exc:
+        print(f"climat: chargement impossible ({exc})", flush=True)
 
 
 def kc_mensuels(ref, culture: str) -> Optional[list]:
