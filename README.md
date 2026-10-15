@@ -102,7 +102,8 @@ d'environnement `IRRIG_COMMUNE_DEFAUT`, `IRRIG_DEPARTEMENT_DEFAUT`, `IRRIG_CULTU
   (codes `kc_01` à `kc_12`, feuille Cultures), ETP et P de `climate_data.xlsx` au point de
   grille le plus proche du centre de la commune (horizon `IRRIG_HORIZON_CLIMAT`, H1 par
   défaut). En l'absence de Kc ou de donnée climatique, la valeur du référentiel s'applique.
-  La lecture du classeur étant lente, un cache `climate_data.cache.npz` est créé à côté.
+  La lecture du classeur étant lente, un cache `climate_data.cache.npz` est créé à côté,
+  reconnu par l'empreinte du fichier (pas par sa date de modification).
 - *Infrastructure déjà amortie* (case à droite du titre « Source de l'eau ») et *Matériel
   déjà amorti* (à droite du titre « Équipement ») : le capital est réputé remboursé.
   L'annuité et le CAPEX d'accès à la ressource tombent à zéro ; l'entretien, l'énergie,
@@ -414,5 +415,5 @@ Fichiers prévus pour un hébergeur de type PaaS (Render, Scalingo, Clever Cloud
 
 Le référentiel, `climate_data.xlsx` et `carte-violet/` font partie de l'envoi : après
 une modification du référentiel, il faut redéployer pour que la version en ligne la prenne
-en compte. Au premier démarrage, la lecture de `climate_data.xlsx` prend quelques
-secondes (le cache `.npz` est régénéré).
+en compte. Le cache `climate_data.cache.npz` est réutilisé tant que le contenu du
+classeur ne change pas ; un simple redéploiement ne relance pas sa lecture.

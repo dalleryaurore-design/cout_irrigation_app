@@ -12,11 +12,14 @@ Déficit hydrique mensuel, sommé sur les mois où la culture est en place :
   commune est celle du point de grille le plus proche de son centre.
 
 La lecture du classeur prend plusieurs secondes : les données sont mises en cache
-dans un fichier ``.npz`` voisin, régénéré dès que le classeur change.
+dans un fichier ``.npz`` voisin. Le cache est valide tant que l'empreinte SHA-256
+du classeur ne change pas (la date de modification ne suffit pas : un checkout git
+la réécrit et forcerait une relecture à chaque déploiement).
 """
 
 from __future__ import annotations
 
+import hashlib
 import os
 import threading
 from typing import Any, Dict, Optional, Tuple
@@ -68,27 +71,37 @@ def _lire_classeur(chemin: str) -> Dict[str, np.ndarray]:
             "ids": np.array(list(points.keys()))}
 
 
+def _empreinte(chemin: str) -> str:
+    """SHA-256 du classeur. Indépendant de la date de modification du fichier."""
+    h = hashlib.sha256()
+    with open(chemin, "rb") as f:
+        for bloc in iter(lambda: f.read(1 << 20), b""):
+            h.update(bloc)
+    return h.hexdigest()
+
+
 def _charger(chemin: str) -> Optional[Dict[str, Any]]:
-    """Données climatiques en mémoire (depuis le cache .npz si à jour)."""
+    """Données climatiques en mémoire (depuis le cache .npz si le contenu n'a pas changé)."""
     if not chemin or not os.path.exists(chemin):
         return None
     mtime = os.path.getmtime(chemin)
     with _verrou:
         if _donnees.get("mtime") == mtime and _donnees.get("chemin") == chemin:
             return _donnees
+        empreinte = _empreinte(chemin)
         cache = os.path.splitext(chemin)[0] + ".cache.npz"
         d = None
         if os.path.exists(cache):
             try:
                 with np.load(cache) as z:
-                    if float(z["mtime"]) == mtime:
+                    if "empreinte" in z.files and str(z["empreinte"]) == empreinte:
                         d = {k: z[k] for k in ("coords", "pluie", "etp", "ids")}
             except Exception:
                 d = None
         if d is None:
             d = _lire_classeur(chemin)
             try:
-                np.savez_compressed(cache, mtime=np.array(mtime), **d)
+                np.savez_compressed(cache, empreinte=np.array(empreinte), **d)
             except OSError:
                 pass
         _donnees.clear()

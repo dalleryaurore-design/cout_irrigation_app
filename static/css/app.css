@@ -77,6 +77,17 @@
   margin-right: .5rem; vertical-align: baseline;
 }
 
+/* ---------------------------------------------- Calcul en cours */
+.simulation-chargement {
+  margin: 0 0 1rem; padding: .75rem 1rem; font-weight: 700;
+  background: var(--background-alt-blue-france);
+  border-left: .25rem solid var(--border-action-high-blue-france);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .simulation-chargement { animation: simulation-pulse 1.2s ease-in-out infinite; }
+}
+@keyframes simulation-pulse { 50% { opacity: .45; } }
+
 /* ----------------------------------------------------- Indicateurs */
 .indicateur {
   height: 100%; padding: 1rem;
@@ -148,7 +159,8 @@
 
 /* ------------------------------------------------------ Impression */
 @media print {
-  .fr-header, .fr-footer, .fr-btns-group, .fr-tabs__list, .suggestions { display: none !important; }
+  .fr-header, .fr-footer, .fr-btns-group, .fr-tabs__list, .suggestions,
+  .simulation-chargement { display: none !important; }
   .fr-tabs__panel { display: block !important; opacity: 1 !important; }
   .carte--simulation { height: 12rem; }
   .bloc-graphique__cadre { height: 18rem; border: 0; }

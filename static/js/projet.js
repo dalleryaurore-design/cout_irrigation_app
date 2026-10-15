@@ -451,25 +451,38 @@
      4. Simulation
      ========================================================================== */
   var minuterie = null;
+  var generationSimulation = 0;
+
+  function indiquerChargement(actif) {
+    var el = $("simulation-chargement");
+    if (el) { el.hidden = !actif; }
+    var section = $("resultats");
+    if (section) { section.setAttribute("aria-busy", actif ? "true" : "false"); }
+  }
+
   function planifier() {
     clearTimeout(minuterie);
+    generationSimulation += 1;
+    indiquerChargement(true);
     minuterie = setTimeout(simuler, 220);
   }
 
   function simuler() {
     majBlocs();
-    var section = $("resultats");
-    section.setAttribute("aria-busy", "true");
+    var ticket = ++generationSimulation;
+    indiquerChargement(true);
     fetch("/api/simulation", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ entrees: entrees(), surcharges: etat.surcharges, commune: etat.commune })
     }).then(function (r) { return r.json(); }).then(function (res) {
+      if (ticket !== generationSimulation) { return; }
       etat.dernier = res;
       afficher(res);
-      section.setAttribute("aria-busy", "false");
+      indiquerChargement(false);
     }).catch(function (e) {
-      section.setAttribute("aria-busy", "false");
+      if (ticket !== generationSimulation) { return; }
+      indiquerChargement(false);
       html("avertissements", '<div class="fr-alert fr-alert--error fr-alert--sm"><p>Calcul impossible : ' +
         e.message + "</p></div>");
     });

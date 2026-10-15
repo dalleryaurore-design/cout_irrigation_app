@@ -41,6 +41,7 @@
     {#                              SIMULATION                               #}
     {# ===================================================================== #}
     <div id="panel-simulation" class="fr-tabs__panel fr-tabs__panel--selected" role="tabpanel" aria-labelledby="tab-simulation" tabindex="0">
+      <p id="simulation-chargement" class="simulation-chargement" role="status">Calcul en cours…</p>
       <div class="fr-grid-row fr-grid-row--gutters">
         <div class="fr-col-12 fr-col-lg-6">
           <form id="formulaire" class="formulaire-projet" novalidate onsubmit="return false">
@@ -287,7 +288,7 @@
       </div>
 
       {# ------------------------------ Résultats ------------------------------ #}
-      <section id="resultats" class="fr-mt-5w" aria-live="polite" aria-busy="false">
+      <section id="resultats" class="fr-mt-5w" aria-live="polite" aria-busy="true">
         <h2 class="fr-h4 titre-section">Bilan agronomique</h2>
         <div class="fr-grid-row fr-grid-row--gutters">
           <div class="fr-col-12 fr-col-md-4">
