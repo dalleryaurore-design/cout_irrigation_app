@@ -3,14 +3,15 @@
 <span class="fr-tooltip fr-placement" id="{{ id }}" role="tooltip" aria-hidden="true">{{ texte }}</span>
 {%- endmacro %}
 
-{# Valeur d'un paramètre : champ modifiable si « Variable = oui », texte sourcé sinon.
+{# Valeur d'un paramètre : champ modifiable si « Variable = oui », texte sourcé sinon
+   (toujours texte sourcé dans le volet Références : variable de gabarit lecture_seule).
    p : Param ; prefixe : pour garantir l'unicité des identifiants ; suffixe : unité affichée #}
 {% macro valeur(p, prefixe='v', suffixe='') -%}
 {%- if p is none -%}<span class="fr-text--xs texte-mention">–</span>
 {%- else -%}
 {%- set idt = prefixe ~ '-tt-' ~ p.id_html -%}
 {%- set texte = ref.infobulle(p) -%}
-{%- if p.variable -%}
+{%- if p.variable and not lecture_seule -%}
   {%- if p.est_pourcentage -%}
     {%- set v = (p.valeur * 100) | round(2) -%}{%- set pas = 0.5 -%}
     {%- set vmin = (p.vmin * 100) | brut if p.vmin is not none else '' -%}{%- set vmax = (p.vmax * 100) | brut if p.vmax is not none else '' -%}
@@ -31,6 +32,31 @@
 <span class="valeur-sourcee" tabindex="0" aria-describedby="{{ idt }}">{{ p | valeur_param }}{% if suffixe %} {{ suffixe }}{% endif %}</span>{{ infobulle(idt, texte) }}
 {%- endif -%}
 {%- endif -%}
+{%- endmacro %}
+
+{# Champ libre d'une variable (volet Cas personnel) : toute valeur est modifiable, sans bornes #}
+{% macro champ_libre(p) -%}
+{%- set v = ((p.valeur * 100) | round(4)) if (p.est_pourcentage and p.valeur is not none) else p.valeur -%}
+<input class="fr-input champ-param champ-variable" type="number" inputmode="decimal" step="any"
+       id="var-{{ p.id_html }}" data-cle="{{ p.cle }}" data-pct="{{ 1 if p.est_pourcentage else 0 }}"
+       data-defaut="{{ v | brut }}" value="{{ v | brut }}"
+       aria-label="{{ p.objet }} – {{ p.libelle }} ({{ '%' if p.est_pourcentage else p.unite }})">
+{%- endmacro %}
+
+{# Champ dont la valeur par défaut est calculée par la simulation (rendements, besoin en eau, réserve
+   utile, redevance) : rempli par static/js/projet.js. feuille = 'Cultures' : la saisie est une surcharge
+   Cultures|<culture>|code ; feuille vide : une entrée de la simulation nommée code. #}
+{% macro champ_calcule(id, feuille, code, pas, libelle, classes='', bulle=true) -%}
+<input class="fr-input champ-calcule {{ classes }}" type="number" inputmode="decimal" min="0" step="{{ pas }}"
+       id="{{ id }}" data-feuille="{{ feuille }}" data-code="{{ code }}" data-pas="{{ pas }}"
+       aria-label="{{ libelle }}"{% if bulle %} aria-describedby="{{ id }}-tt"{% endif %}>
+{%- endmacro %}
+
+{# Bouton « i » d'information contextuelle (DSFR) : la bulle s'ouvre au clic. Son contenu (méthode
+   retenue, autres méthodes) est rempli par static/js/projet.js dans l'élément id-tt. #}
+{% macro bouton_info(id, libelle) -%}
+<button class="fr-btn--tooltip fr-btn bouton-info" type="button" id="{{ id }}-info" aria-describedby="{{ id }}-tt">{{ libelle }}</button>
+<span class="fr-tooltip fr-placement bulle-methodes" id="{{ id }}-tt" role="tooltip" aria-hidden="true">–</span>
 {%- endmacro %}
 
 {# Cellule calculée (mise à jour par l'API) #}

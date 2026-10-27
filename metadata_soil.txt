@@ -1,0 +1,452 @@
+DATA ABOUT THE SOIL GEOGRAPHICAL DATA BASE OF FRANCE
+This file complies with the CEN (European Committee for Standardisation) 
+project for a standard meta data description for geographic information,
+prEN 287009, April 1996.
+
+
+DATASET IDENTIFICATION 
+---------------------------------------
+
+Dataset title:
+ 
+Soil Geographical Data Base of France at Scale 1:1,000,000
+ version 3.2.8.0, 10/09/1998.
+
+
+Alternative title:
+ 
+Soil Geographical Data Base of France.
+
+
+Alternative title:
+ Base de Donnees Geographique des Sols de France au 1/1 000 000
+ version 3.2.8.0, 10/09/1998.
+
+
+Alternative title:
+ Base de Donnees Geographique des Sols de France.
+
+
+Abbreviated title:
+ SGDBF in english, BDGSF in French.
+
+
+
+DATASET OVERVIEW 
+---------------------------------------------
+
+Abstract:
+ 
+The Soil Geographical Data Base of France at Scale 1:1,000,000 is the French part of the European Soil Geographical Data Base of Europe. The latter is the resulting product of a collaborative project involving all the European Union and neighbouring countries. It is a simplified representation of the diversity and spatial variability of the
+ soil coverage. The methodology used to differentiate and name the main soil types is based on the terminology of the F.A.O. legend for the Soil Map of
+ the World at Scale 1:5,000,000. This terminology has been refined and adapted to take account of the specificities of the landscapes in Europe. It
+ is itself founded on the distinction of the main pedogenetic processes leading to soil differentiation.
+
+ 
+The database contains a list of Soil Typological Units (STU). Besides the
+ soil names they represent, these units are described by variables
+ (attributes) specifying the nature and properties of the soils: for example
+ the texture, the water regime, etc. The geographical
+ representation was chosen at a scale corresponding to the 1:1,000,000. At
+ this scale, it is not feasible to delineate the STUs. Therefore they are
+ grouped into Soil Mapping Units (SMU) to form soil associations and to
+ illustrate the functioning of pedological systems within the landscapes.
+
+ Harmonisation of the soil data from the member countries is based on a
+ dictionary giving the definition for each occurrence of the variables.
+ Considering the scale, the precision of the variables is weak. Furthermore
+ these variables were estimated over large areas by expert judgement rather
+ than measured on local soil samples. This expertise results from synthesis
+ and generalisation tasks of national or regional maps published at more
+ detailed scales, for example 1:50,000 or 1:25,000 scales. Delineation of the
+ Soil Mapping Units is also the result of expertise and experience.
+ Heterogeneity can be considerable in regions. The spatial
+ variability of soils is very important and is difficult to express at global
+ levels of precision. Quality indices of the information (purity and
+ confidence level) are included with the data in order to guide usage.
+
+
+
+Purpose of production:
+ 
+To provide a harmonised and spatially exhaustive coverage of soil types and
+ descriptions in European participating countries at a resolution compatible
+ with a 1:1,000,000-scale map.
+
+
+
+Usage:
+ 
+Soil spatial data query, extraction and thematic mapping, soil spatial data
+ layer input to agro-environmental models (e.g. soil erosion risk, yield
+ forecasting).
+
+
+
+Spatial sub-schema type:
+ 
+Topological planar graph.
+
+
+
+Spatial reference system type:
+ 
+Positioning by Lambert Azimuthal co-ordinates.
+
+
+
+Language:
+ 
+English.
+
+
+
+Document reference:
+ 
+CEC, 1985 - Soil map of the European Communities at 1:1,000,000. CEC-DGVI.
+ Brussels, Belgium. 124 pp.
+ 
+Daroussin J., King D., 1996 - A Pedotransfer Rules Database to interpret
+ the Soil Geographical Data Base of Europe for environmental purposes.
+ In: The use of pedotransfer in soil hydrology research in Europe,
+ workshop proceedings, Orléans, France, 10-12 October 1996. 25-40.
+ 
+EC-JRC, 1995 - European land information systems for agro-environmental
+ monitoring. King D., Jones R.J.A and Thomasson A.J. (Eds.), Brussels,
+ Belgium. 286 pp.
+ 
+FAO-Unesco, 1974 - Soil Map of the World - Legend. Unesco, Paris, France.
+ 62 pp.
+ 
+FAO-Unesco, 1990 - Soil Map of the World - Revised Legend. World Soil
+ Resources Report 60. FAO, Rome, Italy. 120 pp.
+ 
+King D., Daroussin J. and Tavernier R., 1994 - Development of a soil
+ geographical database from the soil map of the European Communities.
+ Catena (21). 37-56.
+ 
+Platou S.W., Norr A.M., Madsen H.B., 1986 - Digitising of the EC soil map.
+ In: Jones R.J.A. and Biagi B. (Eds). Computerisation of Land Use Data.
+ CEC, Brussels, Belgium. 12-24.
+
+
+
+Sample:
+ 
+No sample dataset provided.
+
+
+
+DATASET QUALITY INDICATORS 
+----------------------------------
+
+Process history:
+ 
+-> 1974: soil information was compiled and harmonised over Europe at
+ 1:1,000,000 scale by Prof. R. Tavernier (B) (co-ordinator) and national
+ representatives under FAO funding. Project was abandoned before map
+ publication due to lack of funding.
+ 
+-> 1985: a map limited to the 12 EC member countries is published by Prof. R.
+ Tavernier (B) (co-ordinator) and national representatives under CEC-DG VI
+ for Agriculture funding:
+ 
+  -> Soil Map of the European Communities at scale 1:1,000,000 (CEC, 1985).
+ 
+-> 1986: the EC Soil Map and legend are computerised at ADK (Danish Bureau of
+ Land Data, DK) under CORINE program (CEC-DG XI for Environment) funding:
+ 
+  -> EC Soil Database (Platou et al., 1986).
+ 
+-> 1988: the database is geo-registered to ONC (Operational Navigation Charts)
+ map sheets at Birbeck College (GB) under CORINE program (CEC-DG XI) funding:
+ 
+  -> EC Soil Database version 1.
+ 
+-> 1991: 1) soil database attributes are added using the original FAO project
+ archives (i.e. before across-country harmonisation) by D. King (MARS
+ project, CEC-DG VI);
+ 2) errors checked against original map and corrected in database by
+ INRA (National Agronomic Research Institute, F) under MARS project funding:
+ 
+  -> EC Soil Database version 2 (King et al., 1994).
+ 
+-> 1992: start computerisation of Eastern countries from FAO project archives
+ under MARS project funding:
+ 
+  -> Eastern countries Soil Databases at level of EC Soil Database
+ version 2.
+ 
+-> 1995: 1) database is further geo-registered through "rubber-sheeting"
+ adjustment to drainage, political, ocean and populated places layers in
+ DCW (Digital Chart of the World database) by INRA (F) under MARS project
+ funding;
+ 2) database is checked for errors and new attributes are added by
+ Contributing Organisations within database member countries, co-ordination
+ and data management by INRA (F), funding from MARS project;
+ 
+  -> EC Soil Database version 3 (King et al., 1995).
+ 
+-> 1996: database is extended to several non EU countries by Contributing
+ Organisations within new database member countries, co-ordination and data
+ management by INRA (F), funding from MARS project:
+ 
+  -> EC Soil Database version 3.1.
+ 
+-> 1996-1998: corrections, minor database structure modifications by
+ INRA (F), border harmonisation for some countries by Contributing
+ Organisations, extension to several non EU countries by Contributing
+ Organisations within new database member countries, co-ordination and
+ data management by INRA (F), funding from MARS project:
+ 
+  -> EC Soil Data Base version 3.21, 3.22... 3.27.
+
+
+
+
+
+Overall positional accuracy:
+ 
+ Estimated: 500 - 5000 m (0.5 - 5 mm at scale 1:1,000,000). Dataset internal
+ tolerance set to 100 m (0.1 mm at scale 1:1,000,000). Minimum polygon area
+ set to 9 ha (0.3 x 0.3 mm at scale 1:1,000,000).
+
+
+
+Overall thematic accuracy:
+ 
+1) Each Soil Typological Unit in the database is characterised by a overall
+ confidence level (high, medium, low; see further "data definition and
+ classification").
+ 
+2) All polygons representing areas above 25 km2 have been checked/corrected
+ against original soil map.
+ 
+3) There is a remaining heterogeneity among database member countries in the
+ mapping methodology (e.g. discrepancies in the amount of detail given to
+ object geometry and/or description).
+ 
+4) This version of the database lacks border harmonisation for some countries.
+
+
+
+Overall temporal accuracy:
+ 
+No temporal values within the dataset. The earliest data are from 1980, the
+ latest from 1996. Year of reference of each object is not indicated.
+
+
+
+Overall logical accuracy:
+ 
+100% structural integrity according to tests carried out by co-ordinator
+ (INRA, F).
+
+
+
+Overall completeness:
+ 
+Estimated 90% (there is still some missing information for some attributes).
+
+
+
+SPATIAL REFERENCE SYSTEM 
+-----------------------------------
+
+INDIRECT SPATIAL REFERENCE SYSTEM:
+
+Type of indirect spatial reference system:
+ 
+By country.
+
+
+
+Reference date:
+ 1996.
+
+
+
+DIRECT SPATIAL REFERENCE SYSTEM:
+
+PROJCS["RGF_1993_Lambert_93",GEOGCS["GCS_RGF_1993",DATUM["D_RGF_1993",SPHEROID["GRS_1980",6378137.0,298.257222101]],PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433]],
+PROJECTION["Lambert_Conformal_Conic"],
+PARAMETER["False_Easting",700000.0],
+PARAMETER["False_Northing",6600000.0],
+PARAMETER["Central_Meridian",3.0],
+PARAMETER["Standard_Parallel_1",44.0],
+PARAMETER["Standard_Parallel_2",49.0],
+PARAMETER["Latitude_Of_Origin",46.5],
+UNIT["Meter",1.0]]
+
+EXTENT ----------------------------------------------------
+CURRENCY OF EXTENT DATA AND COMPLETENESS OF DATASET:
+
+Extent date:
+ 
+30/10/1996
+
+
+Extent status:
+ 100% of the extent covered.
+
+
+
+PLANAR EXTENT:
+
+Bounding XY:
+Min XY: 47837.555 1617939.750
+Max XY : 1197497.125 2677724.000
+
+
+
+Bounding Area:
+ 
+Definition: -
+
+
+
+Geographic area:
+ 
+Type of indirect spatial reference system:
+ 
+by country.
+ 
+Name of areal unit:
+ 
+FRANCE
+Id code of areal unit:
+ 
+FR
+
+
+Coverage:
+ ~ 70%.
+
+
+
+VERTICAL EXTENT:
+
+Min elevation value:
+ -6 m
+
+
+Max elevation value:
+ 4000 m
+
+
+
+TEMPORAL EXTENT:
+
+From date:
+ Not applicable.
+
+
+To date:
+ Not applicable.
+
+
+
+DATA DEFINITION 
+-------------------------------------------
+
+APPLICATION SCHEMA DESCRIPTION:
+
+Application schema id:
+ 
+SOIL.
+
+
+Application schema text:
+ 
+Soil types in France.
+
+OBJECT TYPE: see file dictiona.txt
+
+ATTRIBUTE TYPE: see file dictiona.txt
+
+ASSOCIATION TYPE: see file dictiona.txt
+
+
+
+CLASSIFICATION 
+--------------------------------------------
+
+THESAURUS:
+
+Name of thesaurus:
+
+Thesaurus administrator:
+
+
+THESAURUS ELEMENT: see file attricod.txt
+
+
+
+ADMINISTRATIVE META DATA 
+----------------------------------
+
+ORGANISATION AND ORGANISATION ROLE:
+
+Organisation name:
+ Institut National de la Recherche Agrnomique
+Abbreviated organisation name:
+ INRA
+
+
+Organisation address:
+ Infosol, 2163 avenue de la pomme de pin, CS40001 Ardon 45075 Orléans cedex 2
+Organisation role:
+ Distributor.
+
+
+
+POINT OF CONTACT AND POINT OF CONTACT ROLE:
+
+Point of contact name:
+ Christine LE BAS
+
+
+Point of contact address:
+ Infosol, 2163 avenue de la pomme de pin, CS40001 Ardon 45075 Orléans cedex 2
+
+
+
+DISTRIBUTION:
+
+Restrictions on use:
+ 
+Licensed usage : Etalab licence compatible available https://www.etalab.gouv.fr/licence-ouverte-open-licence.
+The data must be cited.
+
+
+
+Copyright owners:
+ 
+ 
+Institut National de la Recherche Agronomique, InfoSol, 2163 avenue de la pomme de pin, CS40001 Ardon 45075 Orléans cedex 2
+
+
+
+
+META DATA REFERENCE 
+---------------------------------------
+
+Entry date:
+ 18/06/1996
+
+
+Last check date:
+ 02/12/1996
+
+Last update date:
+ 05/07/2018
+
+
+Future review date: 
+
+
+
+Spatial reference system of meta data: 
+
+
+-----------------------------------------------------------

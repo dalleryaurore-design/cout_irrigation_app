@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block titre %}Cas personnel – parcelle – {{ TITRE }}{% endblock %}
+{% block css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/leaflet/leaflet.css') }}">
+{% endblock %}
+
+{% block contenu %}
+<div class="fr-container fr-mt-4w">
+  <div class="fr-grid-row fr-grid-row--middle fr-mb-2w">
+    <div class="fr-col-12 fr-col-md">
+      <h1 class="fr-h2 fr-mb-1v">Cas personnel – ma parcelle</h1>
+      <p class="fr-text--sm fr-mb-0 texte-mention">Renseignez votre parcelle, puis ajustez directement vos rendements, votre
+        besoin en eau et vos coûts (devis, tarif de votre ASA, rendements historiques…) : la simulation se met à jour à
+        chaque saisie.</p>
+    </div>
+  </div>
+  <ul class="fr-btns-group fr-btns-group--inline-md fr-btns-group--sm fr-btns-group--icon-left fr-mb-2w barre-actions">
+    <li><button class="fr-btn fr-icon-file-pdf-line" id="telecharger-pdf" type="button">Télécharger le rapport (PDF)</button></li>
+    <li><button class="fr-btn fr-btn--secondary fr-icon-file-download-line" id="telecharger-variables" type="button">Télécharger mes variables (Excel)</button></li>
+    <li><button class="fr-btn fr-btn--secondary fr-icon-upload-line" id="importer-variables" type="button">Importer mes variables</button></li>
+    <li><button class="fr-btn fr-btn--tertiary fr-icon-refresh-line" id="reinitialiser" type="button">Rétablir les valeurs du référentiel</button></li>
+  </ul>
+  <input type="file" id="fichier-variables" accept=".xlsx" hidden>
+  <p class="fr-message" id="etat-fichiers" aria-live="polite"></p>
+
+  {% include "_simulation.html" %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='vendor/leaflet/leaflet.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/chartjs/chart.umd.min.js') }}"></script>
+<script src="{{ statique('js/cascade.js') }}"></script>
+<script src="{{ statique('js/carte-commune.js') }}"></script>
+<script src="{{ statique('js/projet.js') }}"></script>
+{% endblock %}

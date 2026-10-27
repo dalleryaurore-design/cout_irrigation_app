@@ -2,6 +2,10 @@
 documentation/
 couts _irrigation.xlsx
 referentiel/*.backup-*.xlsx
+# Carte de réserve utile d'origine (640 Mo) : l'application lit sol/ru_sol_1km.tif (outils/preparer_sol.py)
+AWCr_mm_0_200.tif
+# Entrées journalières de la comparaison CropWat / MAELIA (8 Mo, régénérées par outils/comparer_modeles.py)
+validation/entrees_journal.csv
 ~$*
 
 # Python

@@ -13,7 +13,7 @@
         <li><em>n</em> : durée de vie en années ;</li>
         <li><em>a</em> : facteur d'annualisation, appelé ici « taux d'amortissement annuel ». Si <em>i</em> = 0, <em>a</em> = 1/<em>n</em> (amortissement linéaire).</li>
       </ul>
-      <p class="fr-mb-0"><strong>Application à la simulation en cours :</strong> <span id="annuite-{{ contexte }}-exemple">sélectionnez une situation dans l'onglet Simulation.</span></p>
+      {% if not lecture_seule %}<p class="fr-mb-0"><strong>Application à la simulation en cours :</strong> <span id="annuite-{{ contexte }}-exemple">sélectionnez une situation dans l'onglet Simulation.</span></p>{% endif %}
     </div>
   </section>
 </div>

@@ -1,35 +1,81 @@
 {% extends "base.html" %}
-{% block titre %}Exemples – {{ TITRE }}{% endblock %}
+{% block titre %}Simulations exemples – {{ TITRE }}{% endblock %}
+{% block css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/leaflet/leaflet.css') }}">
+{% endblock %}
+
 {% block contenu %}
 <div class="fr-container fr-mt-4w">
-  <h1 class="fr-h2">Exemples</h1>
-  <div class="fr-grid-row fr-grid-row--gutters">
-    {% for x in ref.exemples %}
-    <div class="fr-col-12 fr-col-md-6 fr-col-lg-4">
-      <div class="fr-card fr-enlarge-link fr-card--sm carte-exemple">
-        <div class="fr-card__body">
-          <div class="fr-card__content">
-            <h2 class="fr-card__title"><a href="{{ url_for('projet', exemple=x.id) }}">Exemple {{ x.id }} – {{ x.titre }}</a></h2>
-            <p class="fr-card__desc">{{ x.enjeu }}</p>
-            <div class="fr-card__start">
-              <ul class="fr-tags-group">
-                <li><p class="fr-tag fr-tag--sm">{{ x.culture }}</p></li>
-                <li><p class="fr-tag fr-tag--sm">{{ x.surface | nombre(0) }} ha</p></li>
-              </ul>
-            </div>
-            <div class="fr-card__end">
-              <dl class="fiche-exemple">
-                <div><dt>Commune</dt><dd>{{ x.commune }} ({{ x.departement }})</dd></div>
-                <div><dt>Source de l'eau</dt><dd>{{ x.source }}{% if x.source.startswith('Retenue') and x.retenue == 'collective' %} collective ({{ x.nb_adherents }} adhérents){% endif %}</dd></div>
-                <div><dt>Équipement</dt><dd>{% if x.nb_unites %}{{ x.nb_unites }} × {% endif %}{{ x.equipement | lower if x.nb_unites else x.equipement }}</dd></div>
-              </dl>
+  <div class="fr-grid-row fr-grid-row--middle fr-mb-2w">
+    <div class="fr-col">
+      <h1 class="fr-h2 fr-mb-0">Simulations exemples</h1>
+    </div>
+    <div class="fr-col-auto">
+      <ul class="fr-btns-group fr-btns-group--inline-md fr-btns-group--sm fr-btns-group--icon-left">
+        <li><button class="fr-btn fr-btn--tertiary fr-icon-refresh-line" id="reinitialiser" type="button">Rétablir les valeurs du référentiel</button></li>
+      </ul>
+    </div>
+  </div>
+
+  {% if exemple %}
+  <div class="fr-notice fr-notice--info fr-mb-3w" id="bandeau-exemple">
+    <div class="fr-container"><div class="fr-notice__body">
+      <p><span class="fr-notice__title">Exemple {{ exemple.id }} – {{ exemple.titre }}.</span>
+         <span class="fr-notice__desc">{{ exemple.enjeu }}</span></p>
+      <button class="fr-btn--close fr-btn" title="Masquer le message" onclick="this.closest('.fr-notice').remove()">Masquer le message</button>
+    </div></div>
+  </div>
+  {% endif %}
+
+  <div class="fr-tabs" id="onglets-projet">
+    <ul class="fr-tabs__list" role="tablist" aria-label="Simulations exemples">
+      <li role="presentation"><button id="tab-simulation" class="fr-tabs__tab fr-icon-calculator-line fr-tabs__tab--icon-left" tabindex="{{ 0 if onglet == 'simulation' else -1 }}" role="tab" aria-selected="{{ 'true' if onglet == 'simulation' else 'false' }}" aria-controls="panel-simulation">Simulation</button></li>
+      <li role="presentation"><button id="tab-exemples" class="fr-tabs__tab fr-icon-map-pin-2-line fr-tabs__tab--icon-left" tabindex="{{ 0 if onglet == 'exemples' else -1 }}" role="tab" aria-selected="{{ 'true' if onglet == 'exemples' else 'false' }}" aria-controls="panel-exemples">Exemples</button></li>
+    </ul>
+
+    <div id="panel-simulation" class="fr-tabs__panel{% if onglet == 'simulation' %} fr-tabs__panel--selected{% endif %}" role="tabpanel" aria-labelledby="tab-simulation" tabindex="0">
+      {% include "_simulation.html" %}
+    </div>
+
+    <div id="panel-exemples" class="fr-tabs__panel{% if onglet == 'exemples' %} fr-tabs__panel--selected{% endif %}" role="tabpanel" aria-labelledby="tab-exemples" tabindex="0">
+      <p class="fr-text--sm">Six situations types. Un clic ouvre la simulation pré-remplie, modifiable ensuite.</p>
+      <div class="fr-grid-row fr-grid-row--gutters">
+        {% for x in ref.exemples %}
+        <div class="fr-col-12 fr-col-md-6 fr-col-lg-4">
+          <div class="fr-card fr-enlarge-link fr-card--sm carte-exemple">
+            <div class="fr-card__body">
+              <div class="fr-card__content">
+                <h2 class="fr-card__title"><a href="{{ url_for('exemples', exemple=x.id) }}">Exemple {{ x.id }} – {{ x.titre }}</a></h2>
+                <p class="fr-card__desc">{{ x.enjeu }}</p>
+                <div class="fr-card__start">
+                  <ul class="fr-tags-group">
+                    <li><p class="fr-tag fr-tag--sm">{{ x.culture }}</p></li>
+                    <li><p class="fr-tag fr-tag--sm">{{ x.surface | nombre(0) }} ha</p></li>
+                  </ul>
+                </div>
+                <div class="fr-card__end">
+                  <dl class="fiche-exemple">
+                    <div><dt>Commune</dt><dd>{{ x.commune }} ({{ x.departement }})</dd></div>
+                    <div><dt>Source de l'eau</dt><dd>{{ x.source }}{% if x.source.startswith('Retenue') and x.retenue == 'collective' %} collective ({{ x.nb_adherents }} adhérents){% endif %}</dd></div>
+                    <div><dt>Équipement</dt><dd>{% if x.nb_unites %}{{ x.nb_unites }} × {% endif %}{{ x.equipement | lower if x.nb_unites else x.equipement }}</dd></div>
+                  </dl>
+                </div>
+              </div>
             </div>
           </div>
         </div>
+        {% endfor %}
       </div>
+      <p class="fr-text--sm texte-mention fr-mt-3w">Les exemples et leur enjeu sont définis dans la feuille « Exemples » du référentiel.</p>
     </div>
-    {% endfor %}
   </div>
-  <p class="fr-text--sm texte-mention fr-mt-3w">Les exemples et leur enjeu sont définis dans la feuille « Exemples » du référentiel.</p>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='vendor/leaflet/leaflet.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/chartjs/chart.umd.min.js') }}"></script>
+<script src="{{ statique('js/cascade.js') }}"></script>
+<script src="{{ statique('js/carte-commune.js') }}"></script>
+<script src="{{ statique('js/projet.js') }}"></script>
 {% endblock %}

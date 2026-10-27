@@ -25,6 +25,10 @@ from openpyxl import load_workbook
 
 FEUILLES_PARAMETRES = ["Cultures", "Equipement", "Acces_ressource", "Ressources"]
 
+# Clé spéciale des surcharges : présente et vraie, elle rend modifiables tous les paramètres
+# (volet « Cas personnel »), sans la restriction « Variable = oui » ni les bornes Min / Max.
+CLE_LIBRE = "*libre"
+
 
 def slug(texte: str) -> str:
     """Identifiant ASCII sans espace, utilisable dans un attribut HTML."""
@@ -138,14 +142,17 @@ class Referentiel:
 
     def valeur(self, feuille: str, objet: str, code: str, surcharges: Optional[Dict[str, Any]] = None,
                defaut: Optional[float] = None) -> Optional[float]:
-        """Valeur du référentiel, remplacée par la surcharge si le paramètre est variable."""
+        """Valeur du référentiel, remplacée par la surcharge si le paramètre est variable
+        (ou si les surcharges portent la clé CLE_LIBRE : saisie libre, sans bornes)."""
         p = self.param(feuille, objet, code)
         if p is None:
             return defaut
         v = p.valeur
         if surcharges and p.cle in surcharges:
             s = _nombre(surcharges[p.cle])
-            if s is not None and p.variable:
+            if s is not None and surcharges.get(CLE_LIBRE):
+                v = s
+            elif s is not None and p.variable:
                 if p.vmin is not None:
                     s = max(p.vmin, s)
                 if p.vmax is not None:

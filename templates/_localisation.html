@@ -1,0 +1,32 @@
+{# Localisation commune (volet Comparaison de trajectoires) — static/js/commune.js #}
+<fieldset class="fr-fieldset" aria-labelledby="leg-localisation">
+  <legend class="fr-fieldset__legend" id="leg-localisation">Localisation</legend>
+  <div class="fr-fieldset__element fr-col-12 fr-col-md-6">
+    <div class="fr-input-group recherche-commune">
+      <label class="fr-label" for="commune-recherche">Commune</label>
+      <div class="fr-search-bar" role="search">
+        <input class="fr-input" type="search" id="commune-recherche" autocomplete="off"
+               placeholder="Ex. Benquet, 40280" role="combobox" aria-autocomplete="list"
+               aria-expanded="false" aria-controls="commune-suggestions">
+        <button class="fr-btn" type="button" id="commune-bouton" title="Rechercher la commune">Rechercher</button>
+      </div>
+      <ul class="suggestions" id="commune-suggestions" role="listbox" hidden></ul>
+      <p class="fr-message fr-mt-1w" id="commune-etat" aria-live="polite"></p>
+    </div>
+  </div>
+  <div class="fr-fieldset__element fr-fieldset__element--inline fr-fieldset__element--inline-grow">
+    <div class="fr-select-group">
+      <label class="fr-label" for="agence">Agence de l'eau</label>
+      <select class="fr-select" id="agence">
+        <option value="">– Aucune (pas de redevance calculée) –</option>
+        {% for a in ref.agences %}<option value="{{ a }}" {% if loop.first %}selected{% endif %}>{{ a }}</option>{% endfor %}
+      </select>
+    </div>
+  </div>
+  <div class="fr-fieldset__element fr-fieldset__element--inline">
+    <div class="fr-checkbox-group fr-checkbox-group--sm fr-mt-4w">
+      <input type="checkbox" id="zre">
+      <label class="fr-label" for="zre">Zone de répartition des eaux (ZRE)</label>
+    </div>
+  </div>
+</fieldset>

@@ -27,6 +27,20 @@ ESPECES_CULTIVEES = os.environ.get("IRRIG_ESPECES", os.path.join(RACINE, "espece
 CLIMAT = os.environ.get("IRRIG_CLIMAT", os.path.join(RACINE, "climate_data.xlsx"))
 HORIZON_CLIMAT = os.environ.get("IRRIG_HORIZON_CLIMAT", "H1").strip().upper()
 
+# Réserve utile des sols (mm, 0-200 cm) du bilan hydrique de la méthode SGPE : carte allégée à
+# 1 km produite par outils/preparer_sol.py, sinon la carte d'origine à 90 m (640 Mo, non déployée).
+SOL_RU = os.environ.get("IRRIG_SOL_RU", os.path.join(RACINE, "sol", "ru_sol_1km.tif"))
+SOL_RU_ORIGINE = os.path.join(RACINE, "AWCr_mm_0_200.tif")
+# Profondeur de sol (m) : couche BDGSF bdgsf_classe_prof rasterisée à 1 km par outils/preparer_profondeur.R
+SOL_PROFONDEUR = os.environ.get("IRRIG_SOL_PROFONDEUR", os.path.join(RACINE, "sol", "profondeur_sol_1km.tif"))
+
+# Résultats de la validation des méthodes (outils/comparer_modeles.py) : onglet Références et méthodologie PDF
+VALIDATION = os.environ.get("IRRIG_VALIDATION", os.path.join(RACINE, "validation", "comparaison.csv"))
+
+# Note méthodologique : rédigée dans Word, l'application sert son export PDF (outils/exporter_methodologie.py)
+METHODOLOGIE_DOCX = os.path.join(RACINE, "docs", "methodologie_irrigation.docx")
+METHODOLOGIE_PDF = os.environ.get("IRRIG_METHODOLOGIE", os.path.join(RACINE, "docs", "methodologie_irrigation.pdf"))
+
 # Localisation et culture pré-sélectionnées à l'ouverture de la page Projet.
 COMMUNE_DEFAUT = os.environ.get("IRRIG_COMMUNE_DEFAUT", "76890")
 DEPARTEMENT_DEFAUT = os.environ.get("IRRIG_DEPARTEMENT_DEFAUT", "76")
@@ -42,8 +56,8 @@ LECTURE_CARTES = os.environ.get("IRRIG_LECTURE_CARTES", "1").strip() not in ("0"
 FOND_CARTE = os.environ.get("IRRIG_FOND_CARTE", "1").strip() not in ("0", "non", "false")
 
 # Système de Design de l'État (DSFR) téléchargé sur le poste.
-# Indiquer le dossier qui contient « dsfr.min.css » (en général le dossier « dist »
-# de l'archive téléchargée), ou copier ce contenu dans static/dsfr/.
+# Indiquer le dossier « dist » de l'archive téléchargée (il contient dsfr/dsfr.min.css,
+# fonts/, icons/ et utility/), ou copier ce contenu dans static/dsfr/.
 DSFR_DIR = os.environ.get("IRRIG_DSFR", os.path.join(RACINE, "static", "dsfr"))
 
 # Repli si le DSFR local est introuvable (nécessite un accès à internet)
@@ -54,6 +68,6 @@ HOTE = os.environ.get("IRRIG_HOTE", "127.0.0.1")
 PORT = int(os.environ.get("IRRIG_PORT", "5000"))
 
 # Libellés
-TITRE = "Analyse financière de l'irrigation"
-SOUS_TITRE = "Coût et rentabilité d'un projet d'irrigation à l'échelle de la commune"
+TITRE = "Analyse financière d'un système d'irrigation"
+SOUS_TITRE = ""
 OPERATEUR = "Secrétariat général à la planification écologique"

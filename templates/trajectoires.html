@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block titre %}Comparaison de trajectoires – {{ TITRE }}{% endblock %}
+
+{% macro scenario(n, titre, couleur) -%}
+<div class="fr-col-12 fr-col-lg-4 colonne-scenario" id="colonne-s{{ n }}" {% if n == 3 %}hidden{% endif %}>
+  <div class="scenario" style="--scenario-couleur: {{ couleur }}" data-n="{{ n }}">
+    <div class="fr-input-group">
+      <label class="fr-label" for="s{{ n }}-nom">Nom du scénario</label>
+      <input class="fr-input" id="s{{ n }}-nom" data-champ="nom" value="{{ titre }}">
+    </div>
+    <div class="fr-select-group">
+      <label class="fr-label" for="s{{ n }}-culture">Culture</label>
+      <select class="fr-select" id="s{{ n }}-culture" data-champ="culture">
+        {% for c in ref.cultures %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="fr-select-group">
+      <label class="fr-label" for="s{{ n }}-horizon">Horizon climatique</label>
+      <select class="fr-select" id="s{{ n }}-horizon" data-champ="horizon">
+        {% for h, lib in horizons.items() %}<option value="{{ h }}">{{ lib[:1] | upper }}{{ lib[1:] }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="fr-select-group">
+      <label class="fr-label" for="s{{ n }}-equipement">Équipement</label>
+      <select class="fr-select" id="s{{ n }}-equipement" data-champ="equipement">
+        {% for e in ref.equipements %}<option value="{{ e }}">{{ e }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="fr-select-group">
+      <label class="fr-label" for="s{{ n }}-source">Source de l'eau</label>
+      <select class="fr-select" id="s{{ n }}-source" data-champ="source">
+        {% for s in ref.sources %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="fr-input-group">
+      <label class="fr-label" for="s{{ n }}-taux">Couverture du besoin en eau (%)
+        <span class="fr-hint-text">100 % = irrigation complète ; en dessous, irrigation de complément partielle.</span></label>
+      <input class="fr-input" type="number" min="0" max="100" step="5" id="s{{ n }}-taux" data-champ="taux" value="100">
+    </div>
+    <div class="fr-input-group">
+      <label class="fr-label" for="s{{ n }}-prix">Prix de vente (€/t)
+        <span class="fr-hint-text">Vide : valeur par défaut de la culture.</span></label>
+      <input class="fr-input" type="number" min="0" step="1" id="s{{ n }}-prix" data-champ="prix">
+    </div>
+    <div class="fr-checkbox-group fr-checkbox-group--sm">
+      <input type="checkbox" id="s{{ n }}-amorti" data-champ="amorti">
+      <label class="fr-label" for="s{{ n }}-amorti">Infrastructure d'accès déjà amortie</label>
+    </div>
+    <div class="fr-checkbox-group fr-checkbox-group--sm">
+      <input type="checkbox" id="s{{ n }}-amorti-equipement" data-champ="amorti_equipement">
+      <label class="fr-label" for="s{{ n }}-amorti-equipement">Matériel déjà amorti</label>
+    </div>
+    {% if n == 3 %}<button type="button" class="fr-btn fr-btn--tertiary-no-outline fr-btn--sm fr-icon-delete-bin-line fr-btn--icon-left fr-mt-2w" id="retirer-s3">Retirer ce scénario</button>{% endif %}
+  </div>
+</div>
+{%- endmacro %}
+
+{% block contenu %}
+<div class="fr-notice fr-notice--warning">
+  <div class="fr-container"><div class="fr-notice__body">
+    <p><span class="fr-notice__title">En cours de construction</span></p>
+  </div></div>
+</div>
+<div class="fr-container fr-mt-4w">
+  <h1 class="fr-h2 fr-mb-1v">Comparaison de trajectoires</h1>
+  <p class="fr-text--sm texte-mention">Pour un même lieu et une même parcelle, comparez deux ou trois trajectoires d'adaptation :
+    changement de culture, d'équipement ou de ressource, horizon climatique, irrigation complète ou partielle.</p>
+
+  <form id="formulaire-trajectoires" novalidate onsubmit="return false">
+    {% include "_localisation.html" %}
+    <fieldset class="fr-fieldset" aria-labelledby="leg-parcelle">
+      <legend class="fr-fieldset__legend" id="leg-parcelle">Parcelle</legend>
+      <div class="fr-fieldset__element fr-fieldset__element--inline fr-fieldset__element--inline-grow">
+        <div class="fr-input-group">
+          <label class="fr-label" for="surface">Surface (ha)</label>
+          <input class="fr-input" type="number" id="surface" min="0.1" step="0.5" value="30">
+        </div>
+      </div>
+    </fieldset>
+
+    <h2 class="fr-h5 fr-mb-2w">Scénarios</h2>
+    <div class="fr-grid-row fr-grid-row--gutters">
+      {{ scenario(1, "Situation actuelle", "#000091") }}
+      {{ scenario(2, "Même culture en 2041-2070", "#6E6EF0") }}
+      {{ scenario(3, "Culture plus sobre en 2041-2070", "#18753C") }}
+    </div>
+    <ul class="fr-btns-group fr-btns-group--inline-md fr-btns-group--sm fr-btns-group--icon-left fr-mt-2w">
+      <li><button type="button" class="fr-btn fr-btn--secondary fr-icon-add-line" id="ajouter-s3">Ajouter un troisième scénario</button></li>
+    </ul>
+  </form>
+
+  <section id="resultats" class="fr-mt-4w" aria-live="polite">
+    <p id="simulation-chargement" class="simulation-chargement" role="status" hidden>Calcul en cours…</p>
+    <h2 class="fr-h4 titre-section">Résultats comparés</h2>
+    <p class="fr-text--sm" id="synthese-trajectoires"></p>
+    <h3 class="fr-h6 fr-mb-1v">Coût de l'irrigation (charges fixes et variables) et gain, par scénario</h3>
+    <div class="bloc-graphique__cadre"><canvas id="graphique-trajectoires" role="img" aria-label="Coût de l'irrigation décomposé en charges fixes et variables, et gain lié à l'irrigation, par scénario"></canvas></div>
+    <div class="fr-mt-3w">
+      {{ m.table_debut("Comparaison des scénarios", 'table-trajectoires') }}
+        <thead><tr id="entete-trajectoires"></tr></thead>
+        <tbody id="corps-trajectoires"></tbody>
+      {{ m.table_fin() }}
+      <p class="fr-text--xs texte-mention">Sous chaque valeur des scénarios 2 et 3 : écart avec le scénario 1, en vert s'il est favorable.</p>
+    </div>
+    <div id="avertissements" class="fr-mt-3w"></div>
+    <div class="fr-callout fr-mt-3w">
+      <p class="fr-callout__text fr-text--sm">Lecture : besoin en eau par la méthode SGPE (ETP et pluie DRIAS, RCP4.5) à
+        l'horizon choisi ; rendements des cartes MAELIA 2020-2040, ou 2040-2060 pour les horizons moyen et lointain lorsque la
+        carte existe, sinon du référentiel. Un seul modèle climatique : les écarts entre horizons sont indicatifs. Prix et
+        coûts constants (euros d'aujourd'hui). <a href="{{ url_for('references', onglet='methode') }}">Méthode</a>.</p>
+    </div>
+  </section>
+</div>
+
+<script id="donnees-page" type="application/json">{{ {
+  'prix_cultures': prix_cultures, 'subventions': subventions, 'horizons': horizons,
+  'defaut': {'commune': COMMUNE_DEFAUT, 'departement': DEPARTEMENT_DEFAUT}
+} | tojson }}</script>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='vendor/chartjs/chart.umd.min.js') }}"></script>
+<script src="{{ statique('js/tableaux.js') }}"></script>
+<script src="{{ statique('js/commune.js') }}"></script>
+<script src="{{ statique('js/trajectoires.js') }}"></script>
+{% endblock %}

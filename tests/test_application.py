@@ -22,7 +22,7 @@ import config  # noqa: E402
 from moteur import cartes  # noqa: E402
 from moteur.calcul import (POSTES, cout_maintenance_ha, facteur_annualisation,  # noqa: E402
                            simuler, type_source, valeurs_derivees)
-from moteur.referentiel import GestionnaireReferentiel, slug  # noqa: E402
+from moteur.referentiel import CLE_LIBRE, GestionnaireReferentiel, slug  # noqa: E402
 
 REF = GestionnaireReferentiel(config.REFERENTIEL).get()
 
@@ -417,6 +417,40 @@ class TestMoteur(unittest.TestCase):
         self.assertGreater(d["d-forage-total"], 0)
 
 
+class TestCharges(unittest.TestCase):
+    def test_charges_fixes_variables_et_sans_subvention(self):
+        for source in REF.sources:
+            r = simuler(REF, entrees(source=source), {}, AGRO)
+            c = r["couts"]
+            self.assertAlmostEqual(c["fixes"] + c["variables"], c["total"], places=6, msg=source)
+            self.assertGreaterEqual(c["sans_subvention"]["total"], c["total"] - 1e-9, source)
+            self.assertAlmostEqual(c["sans_subvention"]["total"] - c["total"], c["aide_publique_annuelle"], places=6)
+            self.assertAlmostEqual(r["bilan"]["sans_subvention"]["total"],
+                                   r["gain"]["total"] - c["sans_subvention"]["total"], places=6)
+        # Sans subvention saisie, les deux coûts sont égaux
+        r = simuler(REF, entrees(subvention_equipement_pct=0, subvention_acces_pct=0), {}, AGRO)
+        self.assertAlmostEqual(r["couts"]["sans_subvention"]["total"], r["couts"]["total"], places=6)
+        # Capital déjà amorti : plus d'annuité, donc plus d'aide publique annuelle
+        r = simuler(REF, entrees(deja_amorti=True, deja_amorti_equipement=True), {}, AGRO)
+        self.assertAlmostEqual(r["couts"]["aide_publique_annuelle"], 0.0, places=6)
+
+    def test_taux_de_couverture(self):
+        plein = simuler(REF, entrees(), {}, AGRO)
+        moitie = simuler(REF, entrees(taux_couverture=50), {}, AGRO)
+        self.assertAlmostEqual(moitie["agro"]["volume_preleve"], plein["agro"]["volume_preleve"] / 2, places=6)
+        self.assertAlmostEqual(moitie["agro"]["delta_rdt"], plein["agro"]["delta_rdt"] / 2, places=6)
+        self.assertLess(moitie["couts"]["variables"], plein["couts"]["variables"])
+
+    def test_saisie_libre(self):
+        fige = REF.param("Equipement", "Pivot", "capex_unitaire")
+        self.assertFalse(fige.variable)
+        s = {fige.cle: fige.valeur * 2}
+        self.assertEqual(REF.valeur("Equipement", "Pivot", "capex_unitaire", s), fige.valeur)
+        s[CLE_LIBRE] = True
+        self.assertEqual(REF.valeur("Equipement", "Pivot", "capex_unitaire", s), fige.valeur * 2)
+
+
+
 class TestRoutes(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -425,10 +459,122 @@ class TestRoutes(unittest.TestCase):
         cls.client = application.app.test_client()
 
     def test_pages(self):
-        for url in ("/", "/projet", "/exemples", "/references", "/projet?exemple=1"):
+        for url in ("/", "/parcelle", "/exemples", "/exemples?exemple=2", "/exemples?onglet=exemples",
+                    "/trajectoires", "/references", "/references?onglet=methode",
+                    "/projet", "/projet?exemple=1"):
             r = self.client.get(url, follow_redirects=True)
             self.assertEqual(r.status_code, 200, url)
             self.assertIn("Analyse financière", r.data.decode("utf-8"), url)
+
+    def test_mode_exploitation_supprime(self):
+        r = self.client.get("/exploitation")
+        self.assertEqual(r.status_code, 302)
+        self.assertTrue(r.headers["Location"].endswith("/parcelle"))
+        self.assertEqual(self.client.post("/api/exploitation", json={}).status_code, 404)
+        self.assertNotIn("Mode exploitation", self.client.get("/parcelle").data.decode("utf-8"))
+
+    def test_rapport_pdf_et_classeur_des_variables(self):
+        import io
+        corps = {"entrees": entrees(), "libre": True,
+                 "surcharges": {"Equipement|Pivot|capex_unitaire": 91000.0,
+                                "Acces_ressource|Général|taux_remplissage": 0.9}}
+        r = self.client.post("/api/rapport-pdf", json=corps)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.data[:5], b"%PDF-")
+        r = self.client.post("/api/variables-excel", json=corps)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.data[:2], b"PK")
+        r = self.client.post("/api/variables-import", data={"fichier": (io.BytesIO(r.data), "variables.xlsx")},
+                             content_type="multipart/form-data")
+        self.assertEqual(r.status_code, 200)
+        d = r.get_json()
+        self.assertAlmostEqual(d["surcharges"]["Equipement|Pivot|capex_unitaire"], 91000.0)
+        self.assertAlmostEqual(d["surcharges"]["Acces_ressource|Général|taux_remplissage"], 0.9)
+        self.assertEqual(d["entrees"]["culture"], "Maïs")
+        self.assertEqual(self.client.post("/api/variables-import").status_code, 400)
+
+    def test_saisie_libre_par_l_api(self):
+        e = entrees(methode_besoin="reference")
+        cle = "Equipement|Pivot|capex_unitaire"
+        base = self.client.post("/api/simulation", json={"entrees": e}).get_json()
+        fige = self.client.post("/api/simulation", json={"entrees": e, "surcharges": {cle: 1.0}}).get_json()
+        libre = self.client.post("/api/simulation", json={"entrees": e, "surcharges": {cle: 1.0}, "libre": True}).get_json()
+        self.assertAlmostEqual(fige["capex"]["equipement"], base["capex"]["equipement"])
+        self.assertAlmostEqual(libre["capex"]["equipement"], 1.0)
+        # Rendement saisi : prime sur la carte et le référentiel
+        r = self.client.post("/api/simulation", json={"entrees": e, "libre": True,
+                                                      "surcharges": {"Cultures|Maïs|rdt_irrigue": 150.0}}).get_json()
+        self.assertEqual(r["agro"]["rdt_irrigue"], 150.0)
+        self.assertEqual(r["agro"]["origine"], "saisie")
+
+    def test_saisies_directes_du_cas_personnel(self):
+        """Réserve utile et redevance saisies : remplacent la valeur calculée, rendue comme valeur par défaut."""
+        commune = {"code": "40192", "nom": "Mont-de-Marsan", "departement": "40", "centre": [-0.5, 43.89],
+                   "contour": None}
+        e = entrees(methode_besoin="sgpe", agence="Adour-Garonne")
+        base = self.client.post("/api/simulation", json={"entrees": e, "commune": commune, "libre": True}).get_json()
+        saisi = self.client.post("/api/simulation", json={
+            "entrees": dict(e, ru_mm=250, redevance_c_m3=5), "commune": commune, "libre": True,
+            "surcharges": {"Cultures|Maïs|besoin_irrigation": 123.0}}).get_json()
+        self.assertEqual(saisi["agro"]["sol"]["ru"], 250)
+        self.assertEqual(saisi["agro"]["sol"]["origine"], "saisie")
+        self.assertAlmostEqual(saisi["agro"]["sol"]["ru_defaut"], base["agro"]["sol"]["ru_defaut"])
+        self.assertEqual(saisi["redevance"]["taux_c_m3"], 5)
+        self.assertEqual(saisi["redevance"]["taux_defaut"], base["redevance"]["taux_c_m3"])
+        self.assertEqual(saisi["agro"]["besoin_mm"], 123.0)
+        self.assertEqual(saisi["agro"]["methode_besoin"], "saisie")
+        self.assertIn("besoin_mm", saisi["agro"]["defauts"])
+
+    def test_rendement_sgpe_et_profondeur_de_sol(self):
+        """Rendement pluvial SGPE = Ym × (1 − Ky (1 − ETa/ETc)) ; profondeur de sol de la carte ou saisie."""
+        commune = {"code": "40192", "nom": "Mont-de-Marsan", "departement": "40", "centre": [-0.5, 43.89],
+                   "contour": None}
+        e = entrees(methode_besoin="sgpe", methode_rendement="sgpe")
+        r = self.client.post("/api/simulation", json={"entrees": e, "commune": commune, "libre": True}).get_json()
+        a = r["agro"]
+        self.assertEqual(a["origine"], "sgpe")
+        self.assertTrue(a["methodes_rendement"]["sgpe"])
+        self.assertEqual(a["rdt_irrigue"], REF.valeur("Cultures", "Maïs", "rdt_irrigue"))
+        self.assertAlmostEqual(a["rdt_pluvial"], a["rdt_irrigue"] * a["sgpe"]["rendement_relatif_sec"], places=6)
+        self.assertLess(a["rdt_pluvial"], a["rdt_irrigue"])
+        superficiel = self.client.post("/api/simulation", json={
+            "entrees": dict(e, profondeur_sol_m=0.5), "commune": commune, "libre": True}).get_json()
+        self.assertEqual(superficiel["agro"]["sol"]["profondeur"], 0.5)
+        self.assertEqual(superficiel["agro"]["sol"]["profondeur_defaut"], a["sol"]["profondeur_defaut"])
+
+    def test_choix_automatique_et_autres_methodes(self):
+        """Besoin : SGPE en priorité ; rendements : MAELIA sinon référentiel ; autres valeurs pour le bouton « i »."""
+        commune = {"code": "40192", "nom": "Mont-de-Marsan", "departement": "40", "centre": [-0.5, 43.89],
+                   "contour": None}
+        r = self.client.post("/api/simulation", json={"entrees": entrees(methode_besoin="auto"),
+                                                      "commune": commune}).get_json()
+        a = r["agro"]
+        self.assertEqual(a["sources"]["besoin_mm"], "sgpe")
+        self.assertIn(a["sources"]["rdt_pluvial"], ("carte", "reference"))
+        for champ in ("besoin_mm", "rdt_irrigue", "rdt_pluvial"):
+            retenues = [x for x in a["alternatives"][champ] if x["retenue"]]
+            self.assertEqual(len(retenues), 1, champ)
+            self.assertAlmostEqual(retenues[0]["valeur"], a["besoin_mm" if champ == "besoin_mm" else champ])
+        self.assertIn("reference", [x["code"] for x in a["alternatives"]["besoin_mm"]])
+        # Sans commune : SGPE impossible, repli sur le référentiel
+        r = self.client.post("/api/simulation", json={"entrees": entrees(methode_besoin="auto")}).get_json()
+        self.assertEqual(r["agro"]["sources"]["besoin_mm"], "reference")
+        # Besoin hors de la plage plausible : avertissement
+        r = self.client.post("/api/simulation", json={"entrees": entrees(), "libre": True,
+                                                      "surcharges": {"Cultures|Maïs|besoin_irrigation": 600}}).get_json()
+        self.assertTrue(any("Besoin en eau élevé" in w["texte"] for w in r["avertissements"]))
+
+    def test_methodologie(self):
+        r = self.client.get("/api/methodologie-pdf")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.data[:5], b"%PDF-")
+        page = self.client.get("/references?onglet=methode").data.decode("utf-8")
+        self.assertIn("Télécharger la méthodologie", page)
+        self.assertIn("methodologie-pdf", page)
+        self.assertNotIn("tab-validation", page)
+        # L'ancienne adresse de l'onglet Validation ouvre la méthodologie
+        page = self.client.get("/references?onglet=validation").data.decode("utf-8")
+        self.assertIn('id="tab-methode" class="fr-tabs__tab fr-icon-file-text-line fr-tabs__tab--icon-left" tabindex="0"', page)
 
     def test_404(self):
         self.assertEqual(self.client.get("/inexistant").status_code, 404)

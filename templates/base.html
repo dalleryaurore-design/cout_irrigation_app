@@ -5,11 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
   <meta name="format-detection" content="telephone=no">
   <title>{% block titre %}{{ TITRE }}{% endblock %}</title>
-  <link rel="stylesheet" href="{{ DSFR_BASE }}/dsfr.min.css">
+  <link rel="stylesheet" href="{{ DSFR_BASE }}/dsfr/dsfr.min.css">
   <link rel="stylesheet" href="{{ DSFR_BASE }}/utility/icons/icons.min.css">
-  <link rel="apple-touch-icon" href="{{ DSFR_BASE }}/favicon/apple-touch-icon.png">
-  <link rel="icon" href="{{ DSFR_BASE }}/favicon/favicon.svg" type="image/svg+xml">
-  <link rel="shortcut icon" href="{{ DSFR_BASE }}/favicon/favicon.ico" type="image/x-icon">
+  {# Icône de l'onglet du navigateur : remplacer les fichiers de static/favicon/ (mêmes noms) #}
+  <link rel="apple-touch-icon" href="{{ statique('favicon/apple-touch-icon.png') }}">
+  <link rel="icon" href="{{ statique('favicon/favicon.svg') }}" type="image/svg+xml">
+  <link rel="shortcut icon" href="{{ statique('favicon/favicon.ico') }}" type="image/x-icon">
   {% block css %}{% endblock %}
   <link rel="stylesheet" href="{{ statique('css/app.css') }}">
 </head>
@@ -38,10 +39,10 @@
               </div>
             </div>
             <div class="fr-header__service">
-              <a href="{{ url_for('projet') }}" title="Accueil – {{ TITRE }}">
+              <a href="{{ url_for('parcelle') }}" title="Accueil – {{ TITRE }}">
                 <p class="fr-header__service-title">{{ TITRE }}</p>
               </a>
-              <p class="fr-header__service-tagline">{{ SOUS_TITRE }}</p>
+              {% if SOUS_TITRE %}<p class="fr-header__service-tagline">{{ SOUS_TITRE }}</p>{% endif %}
             </div>
           </div>
         </div>
@@ -53,15 +54,13 @@
         <div class="fr-header__menu-links"></div>
         <nav class="fr-nav" id="navigation" role="navigation" aria-label="Menu principal">
           <ul class="fr-nav__list">
+            {% for cible, libelle in [('exemples', 'Simulations exemples'), ('parcelle', 'Cas personnel – parcelle'),
+                                      ('trajectoires', 'Comparaison de trajectoires'),
+                                      ('references', 'Références')] %}
             <li class="fr-nav__item">
-              <a class="fr-nav__link" href="{{ url_for('projet') }}" {% if page == 'projet' %}aria-current="page"{% endif %}>Projet</a>
+              <a class="fr-nav__link" href="{{ url_for(cible) }}" {% if page == cible %}aria-current="page"{% endif %}>{{ libelle }}</a>
             </li>
-            <li class="fr-nav__item">
-              <a class="fr-nav__link" href="{{ url_for('exemples') }}" {% if page == 'exemples' %}aria-current="page"{% endif %}>Exemples</a>
-            </li>
-            <li class="fr-nav__item">
-              <a class="fr-nav__link" href="{{ url_for('references') }}" {% if page == 'references' %}aria-current="page"{% endif %}>Références</a>
-            </li>
+            {% endfor %}
           </ul>
         </nav>
       </div>
@@ -83,16 +82,9 @@
     <div class="fr-container">
       <div class="fr-footer__body">
         <div class="fr-footer__brand fr-enlarge-link">
-          <a href="{{ url_for('projet') }}" title="Retour à l'accueil">
+          <a href="{{ url_for('parcelle') }}" title="Retour à l'accueil">
             <p class="fr-logo">République<br>Française</p>
           </a>
-        </div>
-        <div class="fr-footer__content">
-          <p class="fr-footer__content-desc">
-            {{ TITRE }} — outil d'aide à la décision développé pour le {{ OPERATEUR }}.
-            Les résultats sont des ordres de grandeur destinés au cadrage stratégique ; ils ne constituent pas
-            un conseil d'investissement à l'échelle d'une exploitation.
-          </p>
         </div>
       </div>
       <div class="fr-footer__bottom">
@@ -101,15 +93,12 @@
           <li class="fr-footer__bottom-item"><span class="fr-footer__bottom-link">Référentiel du {{ date_referentiel }}</span></li>
           {% if not DSFR_LOCAL %}<li class="fr-footer__bottom-item"><span class="fr-footer__bottom-link">DSFR chargé depuis le CDN</span></li>{% endif %}
         </ul>
-        <div class="fr-footer__bottom-copy">
-          <p>Fonds de carte : Plan IGN (Géoplateforme). Contours communaux : API Découpage administratif (geo.api.gouv.fr).</p>
-        </div>
       </div>
     </div>
   </footer>
 
-  <script type="module" src="{{ DSFR_BASE }}/dsfr.module.min.js"></script>
-  <script nomodule src="{{ DSFR_BASE }}/dsfr.nomodule.min.js"></script>
+  <script type="module" src="{{ DSFR_BASE }}/dsfr/dsfr.module.min.js"></script>
+  <script nomodule src="{{ DSFR_BASE }}/dsfr/dsfr.nomodule.min.js"></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

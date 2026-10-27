@@ -1,10 +1,181 @@
 {% extends "base.html" %}
+{% import "_macros.html" as m with context %}
 {% block titre %}Références – {{ TITRE }}{% endblock %}
 {% block contenu %}
 <div class="fr-container fr-mt-4w">
   <h1 class="fr-h2">Références</h1>
-  <p class="fr-text--lead">Bibliographie complète des sources citées dans l'application, au format APA. Chaque valeur du référentiel renvoie à l'une de ces références ; l'info-bulle affiche la citation courte.</p>
+  <p class="fr-text--sm">Hypothèses du référentiel (valeurs par défaut, sources au survol), bibliographie et méthode de calcul.
+    Pour adapter ces valeurs à votre situation, utilisez le volet
+    <a href="{{ url_for('parcelle') }}">Cas personnel – parcelle</a>.</p>
+  <div class="fr-tabs" id="onglets-references">
+    <ul class="fr-tabs__list" role="tablist" aria-label="Références">
+      <li role="presentation"><button id="tab-cultures" class="fr-tabs__tab fr-icon-plant-line fr-tabs__tab--icon-left" tabindex="{{ 0 if onglet == 'cultures' else -1 }}" role="tab" aria-selected="{{ 'true' if onglet == 'cultures' else 'false' }}" aria-controls="panel-cultures">Cultures</button></li>
+      <li role="presentation"><button id="tab-equipement" class="fr-tabs__tab fr-icon-settings-5-line fr-tabs__tab--icon-left" tabindex="{{ 0 if onglet == 'equipement' else -1 }}" role="tab" aria-selected="{{ 'true' if onglet == 'equipement' else 'false' }}" aria-controls="panel-equipement">Équipement</button></li>
+      <li role="presentation"><button id="tab-acces" class="fr-tabs__tab fr-icon-drop-line fr-tabs__tab--icon-left" tabindex="{{ 0 if onglet == 'acces' else -1 }}" role="tab" aria-selected="{{ 'true' if onglet == 'acces' else 'false' }}" aria-controls="panel-acces">Accès à la ressource en eau</button></li>
+      <li role="presentation"><button id="tab-ressources" class="fr-tabs__tab fr-icon-money-euro-circle-line fr-tabs__tab--icon-left" tabindex="{{ 0 if onglet == 'ressources' else -1 }}" role="tab" aria-selected="{{ 'true' if onglet == 'ressources' else 'false' }}" aria-controls="panel-ressources">Ressources</button></li>
+      <li role="presentation"><button id="tab-references" class="fr-tabs__tab fr-icon-book-2-line fr-tabs__tab--icon-left" tabindex="{{ 0 if onglet == 'references' else -1 }}" role="tab" aria-selected="{{ 'true' if onglet == 'references' else 'false' }}" aria-controls="panel-references">Références</button></li>
+      <li role="presentation"><button id="tab-methode" class="fr-tabs__tab fr-icon-file-text-line fr-tabs__tab--icon-left" tabindex="{{ 0 if onglet == 'methode' else -1 }}" role="tab" aria-selected="{{ 'true' if onglet == 'methode' else 'false' }}" aria-controls="panel-methode">Méthodologie</button></li>
+    </ul>
 
+    <div id="panel-cultures" class="fr-tabs__panel{% if onglet == 'cultures' %} fr-tabs__panel--selected{% endif %}" role="tabpanel" aria-labelledby="tab-cultures" tabindex="0">
+      <h2 class="fr-h4">Valeurs par défaut des cultures</h2>
+      <p class="fr-text--sm">Rendements et besoin en eau utilisés lorsque la culture n'a pas de carte ou que « Référence » est
+        choisi ; profondeur d'enracinement et fraction p du bilan hydrique de la méthode SGPE.</p>
+      {{ m.table_debut('Valeurs par défaut des cultures', 'table-cultures') }}
+        <thead><tr><th scope="col">Culture</th><th scope="col" class="num">Rendement irrigué (q/ha)</th><th scope="col" class="num">Rendement pluvial (q/ha)</th><th scope="col" class="num">Besoin (mm)</th><th scope="col" class="num">Prix de vente (€/t)</th><th scope="col" class="num">Enracinement max. (m)</th><th scope="col" class="num">Fraction p</th><th scope="col" class="num">Ky</th><th scope="col">Carte</th></tr></thead>
+        <tbody>
+        {% for c in ref.cultures %}{% set pp = ref.params_objet('Cultures', c) %}
+        <tr><th scope="row">{{ c }}</th>
+          <td class="num">{{ m.valeur(pp.get('rdt_irrigue'), 'cu') }}</td>
+          <td class="num">{{ m.valeur(pp.get('rdt_pluvial'), 'cu') }}</td>
+          <td class="num">{{ m.valeur(pp.get('besoin_irrigation'), 'cu') }}</td>
+          <td class="num">{{ m.valeur(pp.get('prix_vente'), 'cu') }}</td>
+          <td class="num">{{ m.valeur(pp.get('zr_max'), 'cu') }}</td>
+          <td class="num">{{ m.valeur(pp.get('p_fao'), 'cu') }}</td>
+          <td class="num">{{ m.valeur(pp.get('ky'), 'cu') }}</td>
+          <td>{% if c in catalogue and catalogue[c].complet %}<span class="fr-badge fr-badge--sm fr-badge--blue-ecume">{{ catalogue[c].code }}</span>{% else %}–{% endif %}</td></tr>
+        {% endfor %}
+        </tbody>
+      {{ m.table_fin() }}
+      {% set gs = ref.params_objet('Cultures', 'Général') %}
+      {% if gs %}
+      <h3 class="fr-h6 fr-mt-3w">Paramètres généraux du bilan hydrique</h3>
+      <div class="fr-grid-row fr-grid-row--gutters parametres-generaux">
+        {% for code in ['ru_defaut', 'profondeur_sol', 'zr_ini', 'depletion_initiale'] %}{% if gs.get(code) %}
+        <div class="fr-col-12 fr-col-md-3"><p class="fr-mb-1v fr-text--sm fr-text--bold">{{ gs[code].libelle }} ({{ '%' if gs[code].est_pourcentage else gs[code].unite }})</p>{{ m.valeur(gs[code], 'cug') }}</div>
+        {% endif %}{% endfor %}
+      </div>
+      {% endif %}
+    </div>
+
+    <div id="panel-equipement" class="fr-tabs__panel{% if onglet == 'equipement' %} fr-tabs__panel--selected{% endif %}" role="tabpanel" aria-labelledby="tab-equipement" tabindex="0">
+      <h2 class="fr-h4">Équipements d'irrigation</h2>
+      {% set g = ref.params_objet('Equipement', 'Général') %}
+      <div class="fr-grid-row fr-grid-row--gutters fr-mb-2w parametres-generaux">
+        <div class="fr-col-12 fr-col-md-6"><p class="fr-mb-1v fr-text--sm fr-text--bold">{{ g.taux_actualisation.libelle }} (%)</p>{{ m.valeur(g.taux_actualisation, 'eqg') }}</div>
+        <div class="fr-col-12 fr-col-md-6"><p class="fr-mb-1v fr-text--sm fr-text--bold">{{ g.taux_subvention.libelle }} (%)</p>{{ m.valeur(g.taux_subvention, 'eqg') }}</div>
+      </div>
+      {{ m.table_debut("Caractéristiques techniques et économiques des équipements", 'table-equipements') }}
+        <thead><tr>
+          <th scope="col">Équipement</th><th scope="col" class="num">CAPEX (€/ha)</th>
+          <th scope="col" class="num">Durée de vie (ans)</th><th scope="col" class="num">Taux d'amortissement annuel</th>
+          <th scope="col" class="num">Annuité brute, avant subvention (€/ha/an)</th>
+          <th scope="col" class="num">Coût main-d'œuvre (€/ha/an)</th>
+          <th scope="col" class="num">Coût maintenance (€/ha/an)</th>
+          <th scope="col" class="num">Coût annuel total (€/ha/an)</th>
+          <th scope="col" class="num">Efficience d'application</th>
+        </tr></thead>
+        <tbody>
+        {% for eq in ref.equipements %}{% set pp = ref.params_objet('Equipement', eq) %}{% set s = eq | slug %}
+          <tr data-equipement="{{ eq }}">
+            <th scope="row">{{ eq }}</th>
+            <td class="num">{{ m.valeur(pp.get('capex_ha'), 'eq') }}</td>
+            <td class="num"><span class="valeur-sourcee duree-vie-affichee" tabindex="0" data-defaut="{{ pp.duree_vie.valeur | brut }}" aria-describedby="dv-eq-{{ s }}-tt">{{ pp.duree_vie | valeur_param }}</span>{{ m.infobulle('dv-eq-' ~ s ~ '-tt', ref.infobulle(pp.duree_vie)) }}</td>
+            <td class="num">{{ m.derivee('d-eq-' ~ s ~ '-taux', derives['d-eq-' ~ s ~ '-taux'], 'pct', 'Facteur d\'annualisation i(1+i)ⁿ / ((1+i)ⁿ − 1)') }}</td>
+            <td class="num">{{ m.derivee('d-eq-' ~ s ~ '-annuite', derives['d-eq-' ~ s ~ '-annuite'], 'euro', 'CAPEX à l\'hectare × taux d\'amortissement annuel (avant subvention)') }}</td>
+            <td class="num">{{ m.valeur(pp.get('mo_eur_ha'), 'eq') }}</td>
+            <td class="num">{{ m.derivee('d-eq-' ~ s ~ '-maint', derives['d-eq-' ~ s ~ '-maint'], 'euro', 'CAPEX à l\'hectare × taux de maintenance') }}</td>
+            <td class="num">{{ m.derivee('d-eq-' ~ s ~ '-total', derives['d-eq-' ~ s ~ '-total'], 'euro', 'Annuité brute + coût de maintenance + coût de main-d\'œuvre, à l\'hectare, avant subvention') }}</td>
+            <td class="num">{{ m.valeur(pp.get('efficience'), 'eq') }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      {{ m.table_fin() }}
+      <p class="fr-text--xs texte-mention">Pour l'enrouleur, le pivot et la rampe, le CAPEX de la simulation est calculé par unité (nombre entier de machines, d'après le CAPEX unitaire et la surface par unité renseignés dans le référentiel) ; pour les autres équipements, par hectare.</p>
+      <p class="fr-text--xs texte-mention">Les annuités et coûts annuels de ce tableau sont bruts, avant toute subvention. Le taux de subvention choisi dans l'onglet Simulation (« Subvention publique ») ne s'applique qu'au CAPEX du matériel ; la maintenance et la main-d'œuvre n'en bénéficient pas.</p>
+      {% with contexte='equipement' %}{% include "_legende_annuite.html" %}{% endwith %}
+    </div>
+    <div id="panel-acces" class="fr-tabs__panel{% if onglet == 'acces' %} fr-tabs__panel--selected{% endif %}" role="tabpanel" aria-labelledby="tab-acces" tabindex="0">
+      <h2 class="fr-h4">Accès à la ressource en eau</h2>
+
+      {% set ga = ref.params_objet('Acces_ressource', 'Général') %}
+      <div class="fr-grid-row fr-grid-row--gutters fr-mb-2w parametres-generaux">
+        {% for code in ['taux_actualisation', 'taux_subvention', 'taux_remplissage'] %}{% if ga.get(code) %}
+        <div class="fr-col-12 fr-col-md-4"><p class="fr-mb-1v fr-text--sm fr-text--bold">{{ ga[code].libelle }} (%)</p>{{ m.valeur(ga[code], 'acg') }}</div>
+        {% endif %}{% endfor %}
+      </div>
+
+      {# Un chiffre par type d'accès ; les autres paramètres sont résumés dans le commentaire.
+         Le réseau d'amenée, commun à tous les types sauf l'ASA, fait l'objet de la dernière ligne. #}
+      {% macro dv(pp, s) -%}
+      <span class="valeur-sourcee duree-vie-affichee" tabindex="0" data-defaut="{{ pp.duree_vie.valeur | brut }}" aria-describedby="dv-acc-{{ s }}-tt">{{ pp.duree_vie | valeur_param }}</span>{{ m.infobulle('dv-acc-' ~ s ~ '-tt', ref.infobulle(pp.duree_vie)) }} ans
+      {%- endmacro %}
+      {% macro subv(pp) -%}
+      {%- if pp.get('taux_subvention') %}{{ m.valeur(pp.taux_subvention, 'src', '%') }}{% else %}{{ ga.taux_subvention | valeur_param }} (taux général){% endif -%}
+      {%- endmacro %}
+      <h3 class="fr-h6">Coûts d'accès par type de ressource</h3>
+      {{ m.table_debut("Coûts d'accès par type de ressource", 'table-sources') }}
+        <thead><tr>
+          <th scope="col">Type d'accès</th><th scope="col" class="num">Coût</th><th scope="col">Unité</th><th scope="col">Commentaire</th>
+        </tr></thead>
+        <tbody>
+        {% for src in ref.sources %}{% set pp = ref.params_objet('Acces_ressource', src) %}{% set s = src | slug %}{% set t = type_source(src) %}
+          <tr data-source="{{ src }}" data-type="{{ t }}">
+            <th scope="row">{{ src }}</th>
+            {% if t == 'forage' %}
+            <td class="num">{{ m.derivee('d-forage-total', derives['d-forage-total'], 'euro', 'Dossier et étude + raccordement + forage × profondeur + station de pompage') }}</td>
+            <td>€</td>
+            <td class="commentaire-acces">Dossier, étude et abri = {{ m.valeur(pp.dossier_etude, 'src') }} € ; raccordement EDF = {{ m.valeur(pp.raccordement_electrique, 'src') }} € ;
+              forage = {{ m.valeur(pp.foration_ml, 'src') }} €/m × {{ m.valeur(pp.profondeur, 'src') }} m ; station de pompage = {{ m.valeur(pp.pompe_abri, 'src') }} €.
+              Amortissement : forage {{ dv(pp, s) }}, station {{ m.valeur(pp.duree_vie_pompe, 'src') }} ans. Subvention {{ subv(pp) }}.</td>
+            {% elif t == 'cours_eau' %}
+            <td class="num">{{ m.valeur(pp.capex_station, 'src') }}</td>
+            <td>€</td>
+            <td class="commentaire-acces">Station de pompage (pompe de surface, crépine, génie civil, compteur). Amortissement {{ dv(pp, s) }}. Subvention {{ subv(pp) }}.</td>
+            {% elif t.startswith('retenue') %}
+            <td class="num">{{ m.valeur(pp.cout_stockage, 'src') }}</td>
+            <td>€/m³ stocké</td>
+            <td class="commentaire-acces">× capacité dimensionnée sur le besoin (station de reprise comprise).
+              {% if pp.part_remplissage_pompe.valeur %}Remplissage pompé à {{ m.valeur(pp.part_remplissage_pompe, 'src', '%') }} (le reste par la pluie).{% else %}Remplissage gravitaire, sans pompage.{% endif %}
+              Amortissement {{ dv(pp, s) }}. Subvention {{ subv(pp) }}.</td>
+            {% elif t == 'asa' %}
+            <td class="num">{{ m.valeur(pp.part_fixe, 'src') }}</td>
+            <td>€/ha/an</td>
+            <td class="commentaire-acces">Part fixe (abonnement) ; part volumétrique = {{ m.valeur(pp.part_volumetrique, 'src') }} €/m³, énergie et redevance comprises ;
+              adhésion et branchement = {{ m.valeur(pp.capex_branchement, 'src') }} €, amortis {{ dv(pp, s) }}. Borne en bord de parcelle : pas de réseau d'amenée.</td>
+            {% endif %}
+          </tr>
+        {% endfor %}
+          <tr class="ligne-reseau">
+            <th scope="row">Réseau d'amenée (source → parcelle)</th>
+            <td class="num">{{ m.derivee('d-res-capex', derives['d-res-capex'], 'euro', 'Distance × coût des tuyaux') }}</td>
+            <td>€</td>
+            <td class="commentaire-acces">{{ m.valeur(ga.distance_amenee, 'res') }} m × {{ m.valeur(ga.cout_tuyau_ml, 'res') }} €/m ;
+              amortissement {{ m.valeur(ga.duree_vie_reseau, 'res') }} ans, taux {{ m.derivee('d-acc-reseau-taux', derives['d-acc-reseau-taux'], 'pct', 'Facteur d\'annualisation i(1+i)ⁿ / ((1+i)ⁿ − 1)') }}.
+              Subvention au taux du type d'accès. Tous types sauf ASA.</td>
+          </tr>
+        </tbody>
+      {{ m.table_fin() }}
+      {% with contexte='acces' %}{% include "_legende_annuite.html" %}{% endwith %}
+    </div>
+    <div id="panel-ressources" class="fr-tabs__panel{% if onglet == 'ressources' %} fr-tabs__panel--selected{% endif %}" role="tabpanel" aria-labelledby="tab-ressources" tabindex="0">
+      <h2 class="fr-h4">Redevance pour prélèvement des agences de l'eau</h2>
+      {{ m.table_debut("Taux de redevance par agence de l'eau", 'table-redevances') }}
+        <thead><tr>
+          <th scope="col">Agence de l'eau</th><th scope="col" class="num">Cat. 1 – superficielle</th><th scope="col" class="num">Cat. 2 – superficielle</th>
+          <th scope="col" class="num">Cat. 1 – souterraine</th><th scope="col" class="num">Cat. 2 – souterraine</th>
+          <th scope="col" class="num">Seuil cat. 1 (m³/an)</th><th scope="col" class="num">Seuil cat. 2 (m³/an)</th><th scope="col" class="num">Retenue par pompage taxée hors ZRE</th>
+        </tr></thead>
+        <tbody>
+        {% for a in ref.agences %}{% set pp = ref.params_objet('Ressources', a) %}
+          <tr data-agence="{{ a }}">
+            <th scope="row">{{ a }}</th>
+            {% for code in ['cat1_superficielle', 'cat2_superficielle', 'cat1_souterraine', 'cat2_souterraine', 'seuil_cat1', 'seuil_cat2', 'retenue_hors_zre'] %}
+            <td class="num">{% if code == 'retenue_hors_zre' and pp.get(code) %}<span class="valeur-sourcee" tabindex="0" aria-describedby="rz-{{ a | slug }}">{{ 'oui' if pp[code].valeur else 'non' }}</span>{{ m.infobulle('rz-' ~ (a | slug), ref.infobulle(pp[code])) }}{% else %}{{ m.valeur(pp.get(code), 'ag') }}{% endif %}</td>
+            {% endfor %}
+          </tr>
+        {% endfor %}
+        </tbody>
+      {{ m.table_fin() }}
+
+      <h2 class="fr-h4 fr-mt-5w">Énergie</h2>
+      {% set ge = ref.params_objet('Ressources', 'Énergie') %}
+      <div class="fr-grid-row fr-grid-row--gutters fr-mb-2w parametres-generaux">
+        <div class="fr-col-12 fr-col-md-6"><p class="fr-mb-1v fr-text--sm fr-text--bold">{{ ge.prix_energie_m3.libelle }} (€/m³)</p>{{ m.valeur(ge.prix_energie_m3, 'nrj') }}</div>
+      </div>
+      <p class="fr-text--sm">Prix forfaitaire de l'énergie de pompage (CGEDD, 2020), commun à tous les équipements et à toutes les sources d'eau, et appliqué au volume prélevé et, pour une retenue par pompage, au volume pompé en hiver pour la remplir (hors part apportée par la pluie ; nul pour une retenue collinaire, remplie par ruissellement). Lorsque l'eau est livrée sous pression par une ASA (réseau collectif), l'énergie est déjà comprise dans la part volumétrique de l'accès à la ressource et n'est pas facturée séparément : le coût réel pour la situation simulée est visible dans l'onglet Simulation.</p>
+    </div>
+    <div id="panel-references" class="fr-tabs__panel{% if onglet == 'references' %} fr-tabs__panel--selected{% endif %}" role="tabpanel" aria-labelledby="tab-references" tabindex="0">
   <div class="fr-grid-row fr-grid-row--gutters">
     <div class="fr-col-12 fr-col-lg-8">
       <ol class="liste-references">
@@ -27,120 +198,94 @@
       {% endif %}
     </div>
   </div>
+    </div>
+    <div id="panel-methode" class="fr-tabs__panel methode{% if onglet == 'methode' %} fr-tabs__panel--selected{% endif %}" role="tabpanel" aria-labelledby="tab-methode" tabindex="0">
+      <h2 class="fr-h4">Méthodologie</h2>
+      <div class="fr-callout fr-mb-4w">
+        <p class="fr-callout__text">Cette page résume la méthode de calcul. La méthodologie détaillée (équations,
+          paramètres des cultures, sources et comparaison des méthodes) peut être téléchargée en cliquant sur
+          « Télécharger la méthodologie ».</p>
+        <a class="fr-btn fr-btn--sm fr-icon-file-pdf-line fr-btn--icon-left fr-mt-2w" href="{{ url_for('api_methodologie_pdf') }}" download>Télécharger la méthodologie</a>
+      </div>
 
-  <h2 class="fr-h3 fr-mt-6w" id="cartes">Cartes du modèle MAELIA</h2>
-  <p class="fr-text--sm">Les cartes de besoin en eau et de rendements sont des simulations de la plateforme MAELIA
-    <a href="#ref-MODELE_CARTES">(Therond et al., 2014)</a>, version 1.4.31, dont le modèle de culture AqYield
-    <a href="#ref-AQYIELD_2015">(Constantin et al., 2015)</a> calcule le rendement comme le rendement optimal de
-    l'espèce réduit par le stress hydrique. Lorsqu'une culture dispose de ses trois cartes, les rendements et le besoin en eau de la
-    simulation sont lus sur ces cartes : moyenne des mailles de 8 km qui touchent le contour de la commune. L'info-bulle
-    du résultat indique le fichier, la méthode et le nombre de mailles retenues. À défaut, ce sont les valeurs par
-    défaut du référentiel qui s'appliquent.</p>
-  <div class="fr-callout fr-callout--green-emeraude">
-    <h3 class="fr-callout__title">Scénario RCP4.5 et narratif « violet » d'Explore2 : signification et hypothèses</h3>
-    <div class="fr-callout__text texte-scenario">
-      <p><strong>RCP4.5.</strong> Trajectoire intermédiaire d'émissions de gaz à effet de serre du 5<sup>e</sup> rapport
-        du GIEC, avec stabilisation progressive grâce à des politiques climatiques <a href="#ref-RIAHI_2011">(Riahi et
-        al., 2011)</a>. C'est un scénario médian de l'ensemble Explore2, moins pessimiste que le RCP8.5.</p>
-      <p><strong>Explore2.</strong> Projet porté par INRAE et l'Office international de l'eau, qui fournit des
-        projections climatiques et hydrologiques régionalisées sur la France hexagonale et la Corse, corrigées des biais
-        et fournies à la maille de 8 km (64 km²) <a href="#ref-MARSON_2024">(Marson et al., 2024)</a>.</p>
-      <p><strong>Narratif violet.</strong> Parmi les projections d'Explore2, quatre « narratifs » contrastés ont été
-        retenus : vert (réchauffement marqué et hausse des précipitations), jaune (changements futurs relativement peu
-        marqués), orange (fort réchauffement et fort assèchement en été et à l'année) et violet (fort réchauffement et
-        forts contrastes saisonniers). Le narratif violet se situe donc dans la partie haute des changements projetés :
-        les besoins en eau calculés sont plutôt une borne haute <a href="#ref-EXPLORE2_2025">(INRAE &amp; OiEau, 2025)</a>.</p>
-      <p><strong>Horizon 2020-2040.</strong> Moyenne sur une période proche : à cet horizon, l'écart entre modèles
-        climatiques pèse davantage que le choix du scénario d'émissions.</p>
-      <p><strong>Précautions.</strong> Les projections ne sont pas des prévisions ; leur probabilité n'est pas pondérée.
-        Il est déconseillé d'en déduire des comportements à une échelle plus fine que la maille : la valeur communale
-        de la simulation est la moyenne des mailles qui touchent la commune. Un seul narratif ne représente pas
-        l'incertitude climatique.</p>
+      <p>Le modèle calcule, pour une année moyenne, le <strong>coût annuel de l'irrigation</strong> (somme de cinq
+        postes) et le <strong>gain de rendement</strong> qu'elle procure. Le bilan est leur différence :</p>
+      <p class="methode__formule"><code>Bilan (€/an) = gain lié à l'irrigation − (équipement + main-d'œuvre + accès à la ressource + énergie + redevance)</code></p>
+
+      <h3 class="fr-h5 fr-mt-5w">1. Besoin en eau d'irrigation : trois méthodes</h3>
+      <ul>
+        <li><strong>SGPE</strong> : bilan hydrique journalier du sol, sur le modèle de CROPWAT (FAO-56). On irrigue dès que
+          la culture a épuisé la part facilement utilisable de la réserve du sol. Climat DRIAS (RCP4.5, horizon 2021-2050)
+          au point le plus proche de la commune, réserve utile et profondeur du sol de la commune.</li>
+        <li><strong>MAELIA</strong> : moyenne des mailles de 8 km des cartes du modèle MAELIA qui touchent la commune
+          (RCP4.5, narratif « violet » d'Explore2).</li>
+        <li><strong>Référentiel</strong> : valeur moyenne nationale de la culture.</li>
+      </ul>
+      <p>L'application retient la première méthode disponible dans cet ordre. Le bouton « i » à côté du résultat indique la
+        méthode retenue et les valeurs des autres : leur écart donne une idée de l'incertitude.</p>
+      <p class="methode__formule"><code>Volume prélevé (m³) = besoin (mm) × 10 × surface (ha) ÷ efficience du matériel</code></p>
+
+      <h3 class="fr-h5 fr-mt-5w">2. Gain lié à l'irrigation</h3>
+      <p class="methode__formule"><code>Gain (€/an) = (rendement irrigué − rendement pluvial) (q/ha) × 0,1 × prix de vente (€/t) × surface (ha)</code></p>
+      <p>Les rendements irrigué et pluvial viennent des cartes <strong>MAELIA</strong>, sinon du <strong>référentiel</strong>.
+        Une option exploratoire déduit le rendement pluvial du stress hydrique simulé par la méthode SGPE (relation Ky de
+        la FAO). Le modèle compare ces deux situations : il ne représente pas la réponse du rendement au volume d'eau apporté.</p>
+
+      <h3 class="fr-h5 fr-mt-5w">3. Coûts annuels, poste par poste</h3>
+      <p>Chaque investissement est converti en annuité constante sur sa durée de vie, après déduction de la subvention :</p>
+      <p class="methode__formule"><code>Annuité = CAPEX × (1 − taux de subvention) × i(1+i)ⁿ / ((1+i)ⁿ − 1)</code></p>
+      <p class="fr-text--sm">i : taux d'actualisation (3 % par défaut) ; n : durée de vie (ans).</p>
+      <div class="fr-grid-row fr-grid-row--gutters">
+        <div class="fr-col-12 fr-col-md-6">
+          <div class="methode__carte">
+            <h4 class="fr-h6"><span class="pastille" style="background:{{ postes[2][2] }}"></span>Équipement</h4>
+            <p class="methode__formule"><code>Coût = annuité du CAPEX + maintenance (€/ha/an) × surface</code></p>
+            <p class="fr-text--sm">Enrouleur, pivot et rampe : nombre de machines selon la surface couverte par machine,
+              d'où un effet de seuil. Autres équipements : CAPEX à l'hectare.</p>
+          </div>
+        </div>
+        <div class="fr-col-12 fr-col-md-6">
+          <div class="methode__carte">
+            <h4 class="fr-h6"><span class="pastille" style="background:{{ postes[3][2] }}"></span>Main-d'œuvre</h4>
+            <p class="methode__formule"><code>Coût = main-d'œuvre de l'équipement (€/ha/an) × surface</code></p>
+            <p class="fr-text--sm">Pose, dépose et suivi de campagne propres à chaque équipement.</p>
+          </div>
+        </div>
+        <div class="fr-col-12 fr-col-md-6">
+          <div class="methode__carte">
+            <h4 class="fr-h6"><span class="pastille" style="background:{{ postes[4][2] }}"></span>Accès à la ressource</h4>
+            <p class="methode__formule"><code>Coût = annuité (ouvrage + réseau d'amenée) + part fixe + part volumétrique</code></p>
+            <p class="fr-text--sm">Forage, pompage en cours d'eau, retenue collinaire ou par pompage (dimensionnée sur le
+              besoin), réseau collectif (ASA) à tarification binomiale. L'ASA livre l'eau en bord de parcelle, énergie et
+              redevance comprises dans son tarif.</p>
+          </div>
+        </div>
+        <div class="fr-col-12 fr-col-md-6">
+          <div class="methode__carte">
+            <h4 class="fr-h6"><span class="pastille" style="background:{{ postes[0][2] }}"></span>Énergie</h4>
+            <p class="methode__formule"><code>Coût = volume pompé (m³) × prix forfaitaire (€/m³)</code></p>
+            <p class="fr-text--sm">Volume prélevé, plus le remplissage pompé pour une retenue par pompage. Nul pour une ASA.</p>
+          </div>
+        </div>
+        <div class="fr-col-12 fr-col-md-6">
+          <div class="methode__carte">
+            <h4 class="fr-h6"><span class="pastille" style="background:{{ postes[1][2] }}"></span>Redevance agence de l'eau</h4>
+            <p class="methode__formule"><code>Coût = volume prélevé × taux (c€/m³) ÷ 100</code></p>
+            <p class="fr-text--sm">Taux de l'agence selon la zone (ZRE ou non) et l'origine de l'eau, au-delà du seuil
+              d'assujettissement.</p>
+          </div>
+        </div>
+      </div>
+
+      <h3 class="fr-h5 fr-mt-5w">4. Comparaison de trajectoires</h3>
+      <p>Deux ou trois scénarios pour une même commune et une même surface (culture, équipement, ressource, horizon
+        climatique). Avec une couverture partielle du besoin, le volume et le gain de rendement sont réduits dans la même
+        proportion.</p>
     </div>
   </div>
-
-  <h2 class="fr-h3 fr-mt-6w" id="methode">Méthode de calcul</h2>
-  <div class="fr-accordions-group">
-    <section class="fr-accordion">
-      <h3 class="fr-accordion__title"><button type="button" class="fr-accordion__btn" aria-expanded="false" aria-controls="m-agro">Bilan agronomique</button></h3>
-      <div class="fr-collapse" id="m-agro">
-        <p>Les rendements irrigué et pluvial et le besoin en eau d'irrigation sont lus sur les cartes du modèle MAELIA lorsque la culture en dispose : moyenne des mailles de 8 km qui touchent le contour de la commune. À défaut, les valeurs par défaut du référentiel sont utilisées.</p>
-        <p>Les cartes de rendement donnent un <strong>pourcentage du rendement potentiel</strong> (dans MAELIA, modèle de culture AqYield : rendement = effet du stress hydrique × rendement optimal de l'espèce). Elles sont converties en q/ha :</p>
-        <p class="formule">Rendement (q/ha) = % de la carte ÷ 100 × rendement potentiel (q/ha)</p>
-        <p>Le rendement potentiel est le rendement optimal de l'espèce dans le fichier de paramètres de MAELIA (<code>especesCultivees.csv</code>, ligne RENDEMENT_OPTIMAL, en t/ha) lorsqu'il est renseigné ; à défaut, le rendement irrigué du référentiel. L'info-bulle du résultat précise le pourcentage lu et le potentiel retenu.</p>
-        <p>Le besoin en eau d'irrigation peut être estimé selon trois méthodes, au choix sous le résultat : <strong>SGPE</strong> (par défaut ; déficit hydrique mensuel, voir ci-dessous), <strong>carte</strong> (modèle MAELIA) ou <strong>référence</strong> (valeur par défaut du référentiel).</p>
-        <p class="formule">Volume appliqué (m³) = besoin (mm) × 10 × surface (ha)<br>Volume prélevé (m³) = volume appliqué ÷ efficience d'application du matériel</p>
-      </div>
-    </section>
-    <section class="fr-accordion" id="methode-sgpe">
-      <h3 class="fr-accordion__title"><button type="button" class="fr-accordion__btn" aria-expanded="false" aria-controls="m-sgpe">Besoin en eau d'irrigation : méthode SGPE</button></h3>
-      <div class="fr-collapse" id="m-sgpe">
-        <p>La méthode SGPE estime le besoin en eau d'irrigation comme le déficit hydrique de la culture, cumulé sur
-          les mois où elle est en place (coefficient cultural Kc &gt; 0). Chaque mois, le déficit est la part de
-          l'évapotranspiration de la culture non couverte par les précipitations ; un mois excédentaire compte pour
-          zéro et ne compense pas le déficit des autres mois.</p>
-        <p class="formule">Besoin SGPE (mm) = Σ<sub>mois où Kc &gt; 0</sub> max(0 ; ETP<sub>mois</sub> × Kc<sub>culture, mois</sub> − P<sub>mois</sub>)</p>
-        <ul>
-          <li><strong>Coefficients culturaux (Kc).</strong> Douze valeurs mensuelles par culture, feuille « Cultures »
-            du référentiel (codes <code>kc_01</code> à <code>kc_12</code>), d'après la FAO
-            <a href="#ref-FAO_56">(Allen et al., 1998)</a>. Les agrumes reprennent les Kc de l'oranger ; l'olivier
-            retient un Kc constant de 0,55. Un Kc non renseigné pour un mois est compté comme nul.</li>
-          <li><strong>Cultures sans Kc.</strong> Le triticale, le chanvre, la féverole et le pois n'ont pas de
-            coefficients culturaux : la méthode SGPE est indisponible pour ces cultures et le choix est désactivé
-            dans la simulation.</li>
-          <li><strong>Évapotranspiration potentielle (ETP) et précipitations (P).</strong> Cumuls mensuels
-            (indices NORETPC et NORRR) issus de DRIAS <a href="#ref-DRIAS_2020">(Météo-France, 2020)</a> :
-            jeu EURO-CORDEX 2020, modèle ALADIN63_CNRM-CM5, scénario RCP4.5 (émissions modérées).</li>
-          <li><strong>Horizon.</strong> Horizon proche H1 (2021-2050), le plus cohérent avec la période 2020-2040
-            des cartes MAELIA. Les horizons H2 (2041-2070) et H3 (2071-2100) sont disponibles dans
-            les données, mais ne sont pas utilisés dans la simulation.</li>
-          <li><strong>Localisation.</strong> ETP et P sont celles du <strong>point de grille DRIAS (maille de 8 km)
-            le plus proche du centre de la commune</strong>, et non une moyenne départementale. L'info-bulle du
-            résultat indique le point retenu et sa distance au centre de la commune.</li>
-          <li><strong>Couverture.</strong> La France hexagonale est couverte ; la Corse ne l'est pas. Si aucun point
-            n'est situé à moins de 12 km du centre de la commune, ou si aucune commune n'est sélectionnée, la
-            valeur par défaut du référentiel est utilisée et une note le signale.</li>
-        </ul>
-        <p><strong>Limites.</strong> La pluie est comptée en totalité (pas de coefficient de pluie efficace), la
-          réserve utile du sol n'est pas prise en compte et le calendrier cultural est figé par les Kc mensuels.
-          Le besoin obtenu est un besoin net à la parcelle : le volume prélevé est ensuite divisé par l'efficience
-          d'application du matériel, comme pour les autres méthodes.</p>
-      </div>
-    </section>
-    <section class="fr-accordion">
-      <h3 class="fr-accordion__title"><button type="button" class="fr-accordion__btn" aria-expanded="false" aria-controls="m-couts">Postes de coût</button></h3>
-      <div class="fr-collapse" id="m-couts">
-        <ul>
-          <li><strong>Énergie</strong> = (volume prélevé + volume prélevé × part du remplissage pompée) × prix forfaitaire de l'énergie (0,07 €/m³, CGEDD 2020). La part pompée vaut 0 pour une retenue collinaire (remplissage par ruissellement et précipitations) et 95 % par défaut pour une retenue par pompage (remplissage hivernal, complété par la pluie sur le plan d'eau). Si l'eau est livrée sous pression par une ASA (réseau collectif), l'énergie est comprise dans la part volumétrique et n'est pas facturée séparément.</li>
-          <li><strong>Redevance agence de l'eau</strong> = volume prélevé × taux de l'agence (catégorie 1 ou 2, eaux superficielles ou souterraines), si le prélèvement dépasse le seuil d'assujettissement ou si la gestion est collective. Pour une ASA, la redevance est acquittée par le gestionnaire et comprise dans son tarif : elle n'est pas ajoutée une seconde fois.</li>
-          <li><strong>Équipement</strong> = CAPEX × (1 − subvention) × facteur d'annualisation + maintenance. Le CAPEX de l'enrouleur, du pivot et de la rampe est calculé par unité ; celui des autres matériels, par hectare.</li>
-          <li><strong>Main-d'œuvre</strong> = coût de main-d'œuvre de l'équipement (€/ha/an) × surface.</li>
-          <li><strong>Accès à la ressource</strong> = CAPEX de l'ouvrage × (1 − subvention) × facteur d'annualisation de l'ouvrage + réseau d'amenée (distance commune × coût des tuyaux, sauf pour l'ASA) × (1 − subvention) × facteur d'annualisation du réseau + part fixe + part volumétrique. Pour une retenue collective, le coût de l'ouvrage est réparti entre les adhérents ; la station de reprise vers la parcelle est réputée comprise dans le coût au m³ stocké.</li>
-        </ul>
-        <p class="formule">Facteur d'annualisation a = i (1 + i)<sup>n</sup> / [(1 + i)<sup>n</sup> − 1] ; a = 1/n si i = 0</p>
-      </div>
-    </section>
-    <section class="fr-accordion">
-      <h3 class="fr-accordion__title"><button type="button" class="fr-accordion__btn" aria-expanded="false" aria-controls="m-renta">Rentabilité</button></h3>
-      <div class="fr-collapse" id="m-renta">
-        <p class="formule">Gain (€/an) = (rendement irrigué − rendement pluvial) (q/ha) × 0,1 × prix (€/t) × surface (ha)<br>
-          Bilan = gain − coût total<br>
-          Prix de vente minimal = coût total ÷ [(rendement irrigué − rendement pluvial) × 0,1 × surface]<br>
-          Gain de rendement minimal à prix constant = coût total ÷ (0,1 × prix × surface)</p>
-      </div>
-    </section>
-    <section class="fr-accordion">
-      <h3 class="fr-accordion__title"><button type="button" class="fr-accordion__btn" aria-expanded="false" aria-controls="m-limites">Limites de lecture</button></h3>
-      <div class="fr-collapse" id="m-limites">
-        <ul>
-          <li>Le bilan n'est pas une marge nette : il ne déduit pas les surcoûts de production induits par l'irrigation (fertilisation, récolte, séchage) ni les aides couplées.</li>
-          <li>Pour les cultures dont l'irrigation est une condition d'existence (tomate d'industrie, légumes, agrumes, amandier, pommier), le gain correspond à la quasi-totalité du produit et non à un différentiel d'optimisation.</li>
-          <li>Les coefficients des matériels proviennent d'un cas de 30 ha de maïs ; le coût à l'hectare varie fortement avec la surface.</li>
-          <li>Le rattachement de la commune à l'agence de l'eau suit le département ; les circonscriptions des agences suivent en réalité les bassins versants. Le classement en ZRE est saisi par l'utilisateur.</li>
-          <li>L'amélioration de l'efficience réduit le volume prélevé à surface constante, mais peut conduire à étendre les surfaces irriguées : un plafonnement des volumes reste la condition d'une économie d'eau effective <a href="#ref-GRAFTON_2018">(Grafton et al., 2018)</a>.</li>
-        </ul>
-      </div>
-    </section>
-  </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ statique('js/tableaux.js') }}"></script>
 {% endblock %}

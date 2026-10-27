@@ -1,9 +1,8 @@
-# Analyse financière de l'irrigation
+# Analyse financière d'un système d'irrigation
 
 Application web locale (Flask + Système de Design de l'État) qui estime, à l'échelle
 d'une commune, le **coût annuel** et la **rentabilité** d'un projet d'irrigation :
-bilan agronomique, décomposition du coût par poste, graphique en cascade et seuil de
-rentabilité. Chaque hypothèse est sourcée : la source apparaît en info-bulle au survol
+bilan agronomique, décomposition du coût par poste et graphique en cascade. Chaque hypothèse est sourcée : la source apparaît en info-bulle au survol
 de la valeur, la référence complète au format APA dans le volet **Références**.
 
 ---
@@ -48,6 +47,13 @@ IRRIG_DSFR=/chemin/vers/dsfr-1.15.3/dist python app.py
 Si aucun DSFR local n'est trouvé, l'application bascule sur le CDN jsDelivr (accès
 internet requis) et le signale en pied de page.
 
+### Icône de l'onglet du navigateur
+
+L'icône (favicon) est lue dans `static/favicon/` : `favicon.svg` (navigateurs récents),
+`favicon.ico` (32 × 32, anciens navigateurs) et `apple-touch-icon.png` (180 × 180, iOS). Pour la
+changer, remplacez ces trois fichiers en gardant leurs noms, puis rechargez la page
+(Ctrl + F5 : les navigateurs gardent l'icône en cache).
+
 ### Accès réseau
 
 Deux services publics sont appelés depuis le navigateur :
@@ -77,7 +83,42 @@ Pour désactiver en plus la lecture des cartes .tif, ajoutez `IRRIG_LECTURE_CART
 
 ## 2. Utilisation
 
-### Volet Projet
+L'application compte quatre volets (menu principal) :
+
+| Volet | Onglets | Usage |
+|---|---|---|
+| **Simulations exemples** (`/exemples`) | Simulation · Exemples | simulation pré-remplie sur l'un des six exemples du référentiel (`?exemple=N`) ; l'ancienne adresse `/projet` y redirige |
+| **Cas personnel – parcelle** (`/parcelle`, accueil) | — | simulation d'une parcelle où rendements, besoin en eau, réserve utile du sol, coûts, énergie et redevance se saisissent directement ; boutons « Télécharger le rapport (PDF) », « Télécharger mes variables (Excel) », « Importer mes variables » |
+| **Comparaison de trajectoires** (`/trajectoires`, en construction) | — | deux ou trois scénarios pour un même lieu et une même surface (culture, équipement, ressource, horizon climatique H1/H2/H3, couverture du besoin) |
+| **Références** (`/references`) | Cultures · Équipement · Accès à la ressource en eau · Ressources · Références · Méthodologie | hypothèses du référentiel en lecture seule (sources au survol), bibliographie, méthode résumée et téléchargement de la méthodologie détaillée (`?onglet=methode`) |
+
+**Encadrés du bilan économique.** Bilan avec subvention (et sans, en ligne secondaire) ;
+coût de l'irrigation avec subvention, décomposé en **charges fixes** (annuités, maintenance du
+matériel, part fixe du tarif : dues chaque année) et **charges variables** (énergie, redevance,
+part volumétrique, main-d'œuvre) ; coût sans subvention et aide publique annualisée ;
+investissement initial, réparti entre l'agriculteur et l'aide publique.
+
+**Saisie directe (Cas personnel).** Les rendements et le besoin en eau sont des champs de saisie
+dans les encadrés du bilan agronomique : ils affichent la valeur calculée (carte, méthode SGPE ou
+référentiel) tant qu'on ne les modifie pas. Le tableau « Mes hypothèses », sous le formulaire,
+regroupe les coûts d'investissement et charges opérationnelles du matériel et de l'accès à la
+ressource choisis, un prix unique de l'énergie (€/m³), un taux unique de redevance (c€/m³, par
+défaut celui de l'agence, de la catégorie et de l'origine de l'eau) et les paramètres du bilan
+hydrique (réserve utile du sol, profondeur de sol, enracinement, fraction p, épuisement initial).
+Toute valeur est modifiable, sans les bornes Min/Max du référentiel (clé `*libre` des surcharges,
+`moteur/referentiel.py::CLE_LIBRE`) ; vider un champ rétablit sa valeur par défaut.
+Le classeur téléchargé (`moteur/export.py`) contient les choix (feuille Simulation), les variables
+(valeur du référentiel et « Ma valeur ») et les résultats ; modifié dans Excel, il se réimporte.
+Le rapport PDF (`moteur/rapport.py`, police Marianne de `static/fonts/`) reprend la parcelle, les
+bilans avec et sans subvention, la décomposition et les variables modifiées.
+
+**Couverture partielle du besoin (Comparaison de trajectoires).** Volume et gain de rendement réduits
+dans la même proportion (hypothèse simplificatrice).
+
+L'ancien mode exploitation (plusieurs parcelles, ressource partagée) a été supprimé ; l'adresse
+`/exploitation` redirige vers le cas personnel.
+
+### Formulaire de simulation d'une parcelle
 
 **Onglet Simulation.** Renseignez la commune, la culture, la surface, la ressource en
 eau et l'équipement : les résultats se recalculent à chaque modification. Au chargement
@@ -86,22 +127,23 @@ valeurs de `COMMUNE_DEFAUT` / `DEPARTEMENT_DEFAUT` / `CULTURE_DEFAUT` de `config
 (par défaut : Saint-Ouen-du-Breuil, 76890, blé tendre), modifiable via les variables
 d'environnement `IRRIG_COMMUNE_DEFAUT`, `IRRIG_DEPARTEMENT_DEFAUT`, `IRRIG_CULTURE_DEFAUT`.
 
-- *Prix de vente* : deux jeux de valeurs au choix — **prix de marché** (`prix_vente` :
-  prix payés aux producteurs FranceAgriMer, moyenne olympique 2020/21-2024/25, pour les
-  grandes cultures) ou **barème MASAA** de l'assurance récolte 2026 (`prix_masaa`, valeur
-  centrale du barème de prix assuré). Modifiable ; le bouton « Valeur par défaut » rétablit
-  la valeur du jeu choisi.
-- *Utiliser les rendements par défaut du référentiel (sans carte)* : n'est actif que pour
-  les cultures disposant de cartes ; permet de comparer la lecture cartographique aux
-  valeurs par défaut.
-- *Méthode d'estimation* du besoin en eau (sous le résultat) : **SGPE** (par défaut),
-  **Carte** (modèle MAELIA) ou **Référence** (valeur par défaut du référentiel). Une
-  description de chaque méthode s'affiche au survol. Si la méthode cochée est indisponible
-  pour la culture, l'application bascule sur la suivante disponible. La méthode
-  SGPE calcule Σ max(0, ETP × Kc − P) sur les mois où Kc > 0 : Kc mensuels du référentiel
-  (codes `kc_01` à `kc_12`, feuille Cultures), ETP et P de `climate_data.xlsx` au point de
-  grille le plus proche du centre de la commune (horizon `IRRIG_HORIZON_CLIMAT`, H1 par
-  défaut). En l'absence de Kc ou de donnée climatique, la valeur du référentiel s'applique.
+- *Prix de vente* : **prix de marché** du référentiel (`prix_vente` : prix payés aux
+  producteurs FranceAgriMer, moyenne olympique 2020/21-2024/25, pour les grandes cultures),
+  dans tous les volets. Modifiable ; le bouton « Valeur par défaut » le rétablit. Le barème
+  MASAA de l'assurance récolte (`prix_masaa`) reste dans le référentiel mais n'est plus proposé.
+- *Choix automatique de la méthode* (`app.py::_valeurs_agro`) : besoin en eau par **SGPE**,
+  sinon **MAELIA**, sinon **référentiel** ; rendements par **MAELIA**, sinon **référentiel**.
+  La source retenue est indiquée sous le résultat ; le bouton « i » à côté de la valeur ouvre
+  une bulle avec la méthode retenue, sa source et les valeurs des autres méthodes. La case
+  *Rendement pluvial par la méthode SGPE (exploratoire)* applique la relation de la FAO (Ky).
+  Un avertissement s'affiche si le besoin dépasse `besoin_plausible_max` (450 mm). L'API
+  accepte encore `methode_besoin` / `methode_rendement` = `sgpe`, `carte` ou `reference`
+  pour imposer une méthode (placée en tête de l'ordre). La méthode
+  SGPE est un bilan hydrique journalier du sol de type CROPWAT (voir § 5) : Kc mensuels du
+  référentiel (codes `kc_01` à `kc_12`, feuille Cultures), ETP et P de `climate_data.xlsx` au
+  point de grille le plus proche du centre de la commune (horizon `IRRIG_HORIZON_CLIMAT`, H1 par
+  défaut), réserve utile du sol de `sol/ru_sol_1km.tif`. En l'absence de Kc ou de donnée
+  climatique, la valeur du référentiel s'applique.
   La lecture du classeur étant lente, un cache `climate_data.cache.npz` est créé à côté,
   reconnu par l'empreinte du fichier (pas par sa date de modification).
 - *Infrastructure déjà amortie* (case à droite du titre « Source de l'eau ») et *Matériel
@@ -124,16 +166,9 @@ d'environnement `IRRIG_COMMUNE_DEFAUT`, `IRRIG_DEPARTEMENT_DEFAUT`, `IRRIG_CULTU
 - *Subvention* : deux curseurs distincts — l'un pour le matériel d'irrigation (subvention
   de l'État, 40 % par défaut), l'autre pour l'ouvrage d'accès à l'eau et le
   réseau d'amenée (70 % pour une retenue, 45 % pour un forage, par défaut).
-- *Rendement potentiel irrigué / Rendement potentiel pluvial / Besoin en eau
-  d'irrigation* : trois cases à cocher indépendantes, chacune superpose au fond de carte
-  une image couleur de la variable choisie, pour la culture sélectionnée — dégradé rouge
-  (faible) → vert (fort) pour un rendement, jaune (faible) → bleu (fort) pour le besoin en
-  eau. Chaque case n'est activable que si la carte correspondante existe pour la culture ;
-  plusieurs couches peuvent être affichées en même temps. La normalisation des couleurs
-  (min–max) est propre à chaque carte, indiquée dans la légende sous la carte. Calculée
-  côté serveur (`GET /api/carte-variable/<culture>/<variable>`, image PNG reprojetée en
-  EPSG:4326, mise en cache tant que le fichier ne change pas) — voir
-  `moteur/cartes.py::carte_variable`.
+- Les couches couleur des cartes MAELIA ne sont plus proposées sur la carte de la
+  simulation ; l'API `GET /api/carte-variable/<culture>/<variable>` (image PNG, voir
+  `moteur/cartes.py::carte_variable`) reste disponible.
 
 **Onglets Équipement, Accès à la ressource, Ressources.** Les hypothèses en coulisse.
 Les valeurs marquées « Variable » dans le référentiel sont des champs de saisie : leur
@@ -155,9 +190,9 @@ Six situations types. Un clic ouvre le projet pré-rempli, modifiable ensuite.
 
 ### Volet Références
 
-Bibliographie complète au format APA, méthode de calcul,
-limites de lecture, et hypothèses des cartes (scénario RCP4.5 et narratif « violet »
-d'Explore2).
+Valeurs par défaut des cultures (onglet Cultures), hypothèses des équipements, de l'accès à
+la ressource et des redevances, bibliographie complète au format APA, méthode de calcul et
+limites de lecture.
 
 ---
 
@@ -177,7 +212,7 @@ un bandeau d'avertissement s'affiche.
 | Feuille | Contenu |
 |---|---|
 | `Lisez-moi` | conventions de saisie |
-| `Cultures` | 24 cultures × rendement irrigué, rendement pluvial, besoin d'irrigation, prix de vente, condition d'existence |
+| `Cultures` | 24 cultures × rendement irrigué, rendement pluvial, besoin d'irrigation, prix de vente, Kc mensuels, profondeur d'enracinement maximale (`zr_max`) et fraction p (`p_fao`) ; objet `Général` : réserve utile par défaut, profondeur de sol, enracinement au semis, épuisement initial |
 | `Equipement` | 6 matériels × CAPEX, efficience, main-d'œuvre, maintenance, durée de vie ; paramètres généraux (taux d'actualisation, taux de subvention du matériel) |
 | `Acces_ressource` | 5 types d'accès (forage, cours d'eau, retenue collinaire, retenue par pompage, ASA) × investissement, part fixe et volumétrique, distance d'amenée, durées de vie ; paramètres généraux (subvention, réseau d'amenée, taux d'actualisation) |
 | `Ressources` | redevances des 6 agences de l'eau, seuils d'assujettissement, prix de l'énergie |
@@ -286,10 +321,56 @@ a = i (1 + i)ⁿ / [(1 + i)ⁿ − 1]        facteur d'annualisation ; a = 1/n s
 
 gain  = (rendement irrigué − rendement pluvial) × 0,1 × prix (€/t) × surface
 bilan = gain − coût total
-
-prix minimal   = coût total ÷ [(Δ rendement) × 0,1 × surface]
-Δ rendement minimal à prix constant = coût total ÷ (0,1 × prix × surface)
 ```
+
+**Besoin en eau, méthode SGPE** (`moteur/climat.py::bilan_hydrique`) : bilan hydrique journalier
+de la zone racinaire, sur le modèle du calendrier d'irrigation de CROPWAT (FAO-56, chapitre 8) :
+
+```
+Dr(j)  = Dr(j−1) − Peff(j) + Kc × ETP(j) − I(j)            épuisement de la réserve (mm)
+TAW(j) = RU × min(Zr(j), profondeur de sol) ÷ profondeur de sol
+RAW(j) = p × TAW(j),  p = p_FAO + 0,04 × (5 − ETc), borné à [0,1 ; 0,8]
+I(j)   = Dr(j) si Dr(j) > RAW(j)   (en fin de cycle : limité au strict nécessaire jusqu'à la récolte)
+besoin net (mm) = Σ I(j)
+Peff   = P × (125 − 0,2 P) ÷ 125 si P ≤ 250 mm, sinon 125 + 0,1 P    (USDA S.C.S., mensuel)
+Zr     : de zr_ini (0,25 m) au semis à zr_max au pic de Kc, proportionnellement au Kc
+```
+
+RU : réservoir utile de la commune, sommé sur la profondeur de sol estimée, au plus 2 m
+(Román Dobarco et al., 2021, doi:10.15454/9IRARJ ; `sol/ru_sol_1km.tif`), sinon `ru_defaut` ;
+profondeur de sol : classes BDGSF 0,3 / 0,5 / 1 / 2 m (`sol/profondeur_sol_1km.tif`, produite par
+`Rscript outils/preparer_profondeur.R`), sinon `profondeur_sol` ; état initial : `depletion_initiale`
+(0 % = capacité au champ). Cultures pérennes : une année de mise en route. Climat mensuel réparti
+uniformément sur les jours du mois. RU et profondeur sont saisissables dans « Mes hypothèses ».
+
+**Rendements, méthode SGPE** : rendement irrigué (Ym) du référentiel ; rendement pluvial
+`Ym × (1 − Ky × (1 − ETa/ETc))` (FAO-33, `ky` de la feuille Cultures), ETa/ETc venant du même bilan
+hydrique conduit sans irrigation. Les rendements comme le besoin en eau proposent trois méthodes :
+SGPE, MAELIA (cartes), Référence ; la méthode SGPE des rendements est une option exploratoire.
+
+**Paramètres des cultures** : FAO-56 par défaut ; jeux SB2023 du package CropWat (calés pour MAELIA) pour
+le tournesol, le soja et le colza (`outils/kc_sb2023.R` puis `outils/appliquer_kc_sb2023.py`), retenus
+parce que leur besoin moyen est le plus proche de la moyenne MAELIA / référentiel ; le triticale reprend
+les paramètres du blé tendre.
+
+**Note méthodologique** : rédigée dans Word, `docs/methodologie_irrigation.docx` (Garamond, format
+article). L'application sert son export PDF, `docs/methodologie_irrigation.pdf`, par
+`GET /api/methodologie-pdf` (bouton « Télécharger la méthodologie » en tête de l'onglet Références > Méthodologie). Après
+chaque modification du Word, régénérer le PDF :
+
+    python outils/exporter_methodologie.py
+
+(export par Word, sinon LibreOffice ; on peut aussi faire Fichier > Enregistrer sous > PDF dans Word, au
+même emplacement). Les tableaux du Word (Kc, rendements, prix, validation…) ne sont pas mis à jour
+automatiquement : les reporter à la main si le référentiel change. Si le PDF est absent, l'application
+génère à la place la méthodologie de `moteur/methodologie.py` à partir du référentiel et de
+`validation/comparaison.csv`.
+
+**Validation** (`python outils/comparer_modeles.py [n points]`, R et package CropWat d'INRAE requis :
+`install.packages("CropWat", repos = "https://inrae.r-universe.dev")`) : compare, sur un échantillon de
+points DRIAS × cultures ayant des cartes MAELIA, la méthode SGPE au moteur CropWat alimenté par les
+mêmes entrées, à CropWat avec ses propres paramètres de culture, et aux cartes MAELIA. Résultats dans
+`validation/synthese.md` et `validation/comparaison.csv`.
 
 Le type d'accès « ASA » représente tout réseau collectif sous pression, quel que soit son
 gestionnaire (ASA d'irrigants, société d'aménagement régional, concessionnaire d'un canal) :
@@ -312,7 +393,7 @@ coût de construction au m³ stocké.
   induits par l'irrigation (fertilisation, récolte, séchage) ni les aides couplées.
 - **Cultures dont l'irrigation conditionne l'existence** (tomate d'industrie, légumes,
   agrumes, amandier, pommier) : le gain correspond à la quasi-totalité du produit, non à
-  un différentiel d'optimisation. Le seuil de rentabilité se lit alors différemment.
+  un différentiel d'optimisation. Le bilan se lit alors différemment.
 - **Redevances des agences de l'eau** : seules Loire-Bretagne et Seine-Normandie portent
   des taux documentés. Adour-Garonne est partiellement renseignée ; Artois-Picardie,
   Rhin-Meuse et Rhône-Méditerranée-Corse portent des valeurs alignées sur Loire-Bretagne,
@@ -349,17 +430,28 @@ app_cout_irrigation/
 ├── requirements.txt
 ├── moteur/
 │   ├── referentiel.py      lecture du classeur, rechargement à chaud, surcharges
-│   ├── calcul.py           chaîne de calcul (sans dépendance d'interface)
+│   ├── calcul.py           chaîne de calcul d'une parcelle (simuler)
 │   ├── cartes.py           lecture des .tif, extraction communale, rendu PNG
-│   └── climat.py           besoin en eau par la méthode SGPE (ETP × Kc − P)
+│   ├── climat.py           besoin en eau par la méthode SGPE (bilan hydrique type CROPWAT)
+│   ├── sol.py              réserve utile du sol à la commune
+│   ├── export.py           variables par catégorie, classeur Excel des variables (export et import)
+│   └── rapport.py          rapport PDF d'une parcelle (fpdf2)
 ├── referentiel/
 │   └── referentiel_irrigation.xlsx
 ├── carte-violet/            cartes .tif lues par défaut (narratif violet, RCP4.5)
+├── sol/ru_sol_1km.tif       réserve utile 0-200 cm à 1 km (produite depuis AWCr_mm_0_200.tif)
+├── sol/profondeur_sol_1km.tif profondeur de sol (m, BDGSF), produite depuis bdgsf_classe_prof/
+├── outils/                 preparer_sol.py, preparer_profondeur.R (cartes de sol), ajouter_parametres_sol.py,
+│                           ajouter_ky.py (ponctuels), comparer_modeles.py + cropwat_comparaison.R (validation)
+├── validation/             résultats de la comparaison SGPE / CropWat / MAELIA (synthese.md)
 ├── cartes/                 ancien jeu de cartes (narratif jaune, RCP8.5), non lu par défaut
-├── templates/              gabarits Jinja (DSFR)
+├── templates/              gabarits Jinja (DSFR) : parcelle, exemples, trajectoires,
+│                           references ; _simulation.html (formulaire partagé), _localisation.html
 ├── static/
 │   ├── css/app.css
-│   ├── js/{projet,carte-commune,cascade}.js
+│   ├── fonts/              Marianne en TTF (rapport PDF)
+│   ├── js/{projet,carte-commune,cascade}.js   simulation d'une parcelle
+│   ├── js/{trajectoires,commune,tableaux}.js
 │   ├── vendor/             Leaflet 1.9.4, Chart.js 4.5.1
 │   └── dsfr/               Système de Design de l'État 1.15.3
 └── tests/
@@ -374,7 +466,8 @@ python -m unittest discover -s tests -v
 
 Ils couvrent l'intégrité du référentiel (aucune anomalie, références résolues), la
 cohérence du moteur sur toutes les combinaisons culture × ressource × équipement,
-l'effet de seuil des machines, le seuil de rentabilité, la subvention, le capital déjà
+l'effet de seuil des machines, le seuil de rentabilité (calcul moteur), le bilan hydrique SGPE,
+les saisies directes du volet Cas personnel, la subvention, le capital déjà
 remboursé, la redevance et les routes de l'application.
 
 ---
@@ -386,6 +479,7 @@ remboursé, la redevance et les routes de l'application.
 | `IRRIG_REFERENTIEL` | `referentiel/referentiel_irrigation.xlsx` | autre classeur d'hypothèses |
 | `IRRIG_CARTES` | `carte-violet/` | autre dossier de cartes |
 | `IRRIG_CLIMAT` | `climate_data.xlsx` | données ETP / précipitations de la méthode SGPE |
+| `IRRIG_SOL_RU` | `sol/ru_sol_1km.tif` | carte de réserve utile du sol (mm) ; à défaut, `AWCr_mm_0_200.tif` |
 | `IRRIG_HORIZON_CLIMAT` | `H1` | horizon climatique de la méthode SGPE (`H1`, `H2` ou `H3`) |
 | `IRRIG_COMMUNE_DEFAUT` | `76890` | code postal/INSEE pré-rempli à l'ouverture de la page Projet |
 | `IRRIG_DEPARTEMENT_DEFAUT` | `76` | département pré-rempli (départage les homonymes) |
@@ -413,7 +507,8 @@ Fichiers prévus pour un hébergeur de type PaaS (Render, Scalingo, Clever Cloud
 | `.python-version` | version de Python (3.12) |
 | `.gitignore` | fichiers exclus de l'envoi (documentation, classeur de travail, sauvegardes) |
 
-Le référentiel, `climate_data.xlsx` et `carte-violet/` font partie de l'envoi : après
+Le référentiel, `climate_data.xlsx`, `carte-violet/` et `sol/ru_sol_1km.tif` font partie de
+l'envoi (la carte d'origine `AWCr_mm_0_200.tif`, 640 Mo, est exclue par `.gitignore`) : après
 une modification du référentiel, il faut redéployer pour que la version en ligne la prenne
 en compte. Le cache `climate_data.cache.npz` est réutilisé tant que le contenu du
 classeur ne change pas ; un simple redéploiement ne relance pas sa lecture.

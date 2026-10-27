@@ -1,18 +1,21 @@
 /* =========================================================================
-   Analyse financière de l'irrigation — logique de la page « Projet ».
+   Analyse financière d'un système d'irrigation — simulation d'une parcelle
+   (volets « Cas personnel – parcelle » et « Simulations exemples »).
    Enchaînement : saisie ► POST /api/simulation ► affichage des résultats,
-   mise à jour des cellules calculées des onglets et du graphique en cascade.
+   mise à jour des cellules calculées et du graphique en cascade.
    Les rendements et le besoin en eau proviennent des cartes lorsque la culture en
-   dispose ; des couches facultatives (cases à cocher) superposent au fond de carte
-   le rendement irrigué, le rendement pluvial ou le besoin en eau, issus de
-   /api/carte-variable/<culture>/<variable>.
+   dispose, le besoin en eau par défaut du bilan hydrique de la méthode SGPE.
+   Volet Cas personnel (PAGE.libre) : rendements, besoin en eau, réserve utile du
+   sol, redevance et coûts (tableau « Mes hypothèses ») se saisissent directement
+   dans la page ; export Excel des variables, import, rapport PDF.
    ========================================================================= */
 (function () {
   "use strict";
 
   var PAGE = JSON.parse(document.getElementById("donnees-page").textContent || "{}");
   var $ = function (id) { return document.getElementById(id); };
-  var etat = { commune: null, surcharges: {}, dernier: null, nbUnitesManuel: false };
+  /* saisies : entrées dont la valeur par défaut est calculée (réserve utile ru_mm, redevance_c_m3) */
+  var etat = { commune: null, surcharges: {}, saisies: {}, dernier: null, nbUnitesManuel: false };
   var cascade = null, carteSimulation = null;
 
   /* ------------------------------------------------------------- Formats */
@@ -31,13 +34,19 @@
   function pct(v, dec) { return fmt(v * 100, dec === undefined ? 1 : dec) + " %"; }
   function texte(id, t) { var e = $(id); if (e) { e.textContent = t; } }
   function html(id, t) { var e = $(id); if (e) { e.innerHTML = t; } }
-  /* Info-bulle au survol d'une méthode (Carte, SGPE, Référence) : description de la
-     méthode, complétée du motif d'indisponibilité le cas échéant */
-  function aideMethode(radio, motif) {
-    var groupe = radio.closest(".fr-radio-group");
-    if (!groupe) { return; }
-    var aide = groupe.getAttribute("data-aide") || "";
-    groupe.title = motif ? motif + " " + aide : aide;
+  /* Bulle « i » d'un résultat agronomique : méthode retenue et sa source, puis valeurs des autres méthodes */
+  var LIBELLES_SOURCE = { sgpe: "SGPE", carte: "MAELIA", reference: "Référentiel", saisie: "valeur saisie" };
+  function echapper(t) {
+    return String(t === undefined || t === null ? "" : t).replace(/[&<>"]/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+    });
+  }
+  function bulleMethodes(alternatives, source, detail, unite, dec) {
+    var autres = alternatives.filter(function (x) { return !x.retenue; }).map(function (x) {
+      return "<li>" + x.methode + " : " + fmt(x.valeur, dec) + " " + unite + "</li>";
+    }).join("");
+    return "<strong>Méthode retenue : " + (LIBELLES_SOURCE[source] || source) + "</strong><br>" + echapper(detail) +
+      (autres ? "<br><strong>Autres méthodes</strong><ul>" + autres + "</ul>" : "<br>Aucune autre méthode disponible.");
   }
 
   /* ------------------------------------------------------- Export CSV générique */
@@ -185,16 +194,18 @@
      ========================================================================== */
   function entrees() {
     var retenue = document.querySelector('input[name="type-retenue"]:checked');
-    var methode = document.querySelector('input[name="methode-besoin"]:checked');
     return {
-      methode_besoin: methode ? methode.value : "sgpe",
+      ru_mm: etat.saisies.ru_mm === undefined ? null : etat.saisies.ru_mm,
+      redevance_c_m3: etat.saisies.redevance_c_m3 === undefined ? null : etat.saisies.redevance_c_m3,
+      methode_besoin: "auto",
       culture: $("culture").value,
       surface: parseFloat($("surface").value) || 0,
       source: $("source").value,
       equipement: $("equipement").value,
       agence: $("agence").value,
       zre: $("zre").checked,
-      sans_carte: !!document.querySelector('input[name="methode-rendement"][value="reference"]:checked'),
+      methode_rendement: $("rendement-sgpe") && $("rendement-sgpe").checked ? "sgpe" : "auto",
+      profondeur_sol_m: etat.saisies.profondeur_sol_m === undefined ? null : etat.saisies.profondeur_sol_m,
       type_retenue: retenue ? retenue.value : "individuelle",
       nb_adherents: parseInt($("nb-adherents").value, 10) || 1,
       capacite_auto: $("capacite-auto").checked,
@@ -203,7 +214,6 @@
       deja_amorti_equipement: $("deja-amorti-equipement").checked,
       nb_unites: (etat.nbUnitesManuel && $("nb-unites").value) ? parseInt($("nb-unites").value, 10) : null,
       prix_vente: parseFloat($("prix-vente").value) || null,
-      source_prix: sourcePrix(),
       subvention_equipement_pct: nombreOuNull($("subvention-equipement").value),
       subvention_acces_pct: nombreOuNull($("subvention").value)
     };
@@ -228,10 +238,28 @@
     var cle = champ.dataset.cle;
     if (!cle) { return; }
     var v = parseFloat(champ.value);
-    if (isNaN(v)) { delete etat.surcharges[cle]; }
-    else { etat.surcharges[cle] = champ.dataset.pct === "1" ? v / 100 : v; }
     var defaut = parseFloat(champ.dataset.defaut);
-    champ.classList.toggle("champ-param--modifie", !isNaN(defaut) && Math.abs(v - defaut) > 1e-9);
+    var modifie = !isNaN(v) && !(!isNaN(defaut) && Math.abs(v - defaut) < 1e-9);
+    /* Une valeur égale au référentiel (ou une case vidée) n'est pas une modification */
+    if (!modifie) { delete etat.surcharges[cle]; }
+    else { etat.surcharges[cle] = champ.dataset.pct === "1" ? v / 100 : v; }
+    if (isNaN(v) && !isNaN(defaut)) { champ.value = champ.dataset.defaut; }
+    champ.classList.toggle("champ-param--modifie", modifie);
+  }
+
+  /* Une même variable peut figurer deux fois (durée de vie de l'accordéon et du tableau) : les autres
+     champs de la même clé reprennent la valeur. */
+  function synchroniserChamps(source) {
+    document.querySelectorAll(".champ-param[data-cle]").forEach(function (champ) {
+      if (champ === source || champ === document.activeElement) { return; }
+      var cle = champ.dataset.cle, s = etat.surcharges[cle];
+      if (s === undefined) {
+        champ.value = champ.dataset.defaut;
+      } else {
+        champ.value = champ.dataset.pct === "1" ? Math.round(s * 1e6) / 1e4 : s;
+      }
+      champ.classList.toggle("champ-param--modifie", s !== undefined);
+    });
   }
 
   function brancherParametres() {
@@ -240,11 +268,13 @@
       var ev = champ.type === "range" ? "input" : "change";
       champ.addEventListener(ev, function () {
         surchargeDepuisChamp(champ);
+        synchroniserChamps(champ);
         planifier();
       });
     });
     $("reinitialiser").addEventListener("click", function () {
       etat.surcharges = {};
+      etat.saisies = {};
       document.querySelectorAll(".champ-param").forEach(function (champ) {
         champ.value = champ.dataset.defaut;
         champ.classList.remove("champ-param--modifie");
@@ -259,6 +289,7 @@
       etat.nbUnitesManuel = false;
       prixParDefaut();
       subventionsParDefaut(true);
+      synchroniserChamps(null);
       simuler();
     });
   }
@@ -318,6 +349,7 @@
         cellule.textContent = actif ? String(v) : cellule.dataset.defaut;
         cellule.classList.toggle("champ-param--modifie", actif);
       }
+      synchroniserChamps(null);
       planifier();
     }
 
@@ -327,20 +359,61 @@
     return majAffichage;
   }
 
-  /* Prix de vente : valeur du référentiel pour la culture choisie */
-  /* Deux jeux de prix : prix de marché du référentiel, ou barème du prix assuré MASAA (assurance récolte) */
+  /* Prix de vente : prix de marché du référentiel pour la culture choisie */
   var PRIX = PAGE.prix_cultures || {};
 
-  function sourcePrix() {
-    var r = document.querySelector('input[name="source-prix"]:checked');
-    return r ? r.value : "referentiel";
+  function prixParDefaut() {
+    var p = (PRIX.referentiel || {})[$("culture").value];
+    if (p !== undefined && p !== null) { $("prix-vente").value = p; }
   }
 
-  function prixParDefaut() {
-    var src = sourcePrix();
-    var p = (PRIX[src] || {})[$("culture").value];
-    if (p === undefined || p === null) { p = (PRIX.referentiel || {})[$("culture").value]; }
-    if (p !== undefined && p !== null) { $("prix-vente").value = p; }
+  /* Champs à valeur par défaut calculée (volet Cas personnel) : rendements, besoin en eau (surcharges
+     Cultures|<culture>|code), réserve utile du sol et redevance (entrées de la simulation). Le champ
+     affiche la valeur calculée tant qu'il n'est pas modifié ; vidé, il revient à cette valeur. */
+  var DEFAUTS_CALCULES = {};   // id du champ -> dernière valeur calculée
+
+  function cleChampCalcule(champ) {
+    return champ.dataset.feuille ? champ.dataset.feuille + "|" + $("culture").value + "|" + champ.dataset.code : null;
+  }
+
+  function saisieChampCalcule(champ) {
+    var cle = cleChampCalcule(champ);
+    return cle ? etat.surcharges[cle] : etat.saisies[champ.dataset.code];
+  }
+
+  function arrondi(v, pas) {
+    var dec = pas >= 1 ? 0 : Math.round(-Math.log10(pas));
+    return Math.round(v * Math.pow(10, dec)) / Math.pow(10, dec);
+  }
+
+  function brancherChampsCalcules() {
+    document.querySelectorAll(".champ-calcule").forEach(function (champ) {
+      champ.addEventListener("change", function () {
+        var v = parseFloat(champ.value), cle = cleChampCalcule(champ);
+        var defaut = DEFAUTS_CALCULES[champ.id], pas = parseFloat(champ.dataset.pas) || 1;
+        var modifie = !isNaN(v) && v >= 0 && !(defaut !== undefined && defaut !== null &&
+          Math.abs(v - arrondi(defaut, pas)) < pas / 2);
+        if (cle) {
+          if (modifie) { etat.surcharges[cle] = v; } else { delete etat.surcharges[cle]; }
+        } else if (modifie) { etat.saisies[champ.dataset.code] = v; } else { delete etat.saisies[champ.dataset.code]; }
+        if (!modifie && defaut !== undefined && defaut !== null) { champ.value = arrondi(defaut, pas); }
+        champ.classList.toggle("champ-param--modifie", modifie);
+        planifier();
+      });
+    });
+  }
+
+  /* Valeur affichée d'un résultat : texte, ou champ de saisie (valeur saisie, sinon valeur calculée) */
+  function valeurCalculee(id, defaut, pas) {
+    var el = $(id);
+    if (!el) { return; }
+    if (el.tagName !== "INPUT") { el.textContent = fmt(defaut, pas >= 1 ? 0 : 1); return; }
+    DEFAUTS_CALCULES[id] = defaut;
+    var s = saisieChampCalcule(el);
+    if (el !== document.activeElement) {
+      el.value = s !== undefined ? s : (defaut === null || defaut === undefined ? "" : arrondi(defaut, pas));
+    }
+    el.classList.toggle("champ-param--modifie", s !== undefined);
   }
 
   /* ==========================================================================
@@ -369,82 +442,18 @@
     }
     if (majDureeVieEquipementSim) { majDureeVieEquipementSim(); }
     if (majDureeVieBassineSim) { majDureeVieBassineSim(); }
-    majEtatCasesCartesVariables();
+    majHypothesesVisibles();
   }
 
-  /* ==========================================================================
-     3 bis. Couches couleur : rendement irrigué / pluvial / besoin en eau
-     ========================================================================== */
-  var CARTES_VARIABLES = PAGE.cartes_variables || {};
-  var VARIABLES_CARTE = [
-    { id: "rdt_irrigue", libelle: "rendement potentiel irrigué" },
-    { id: "rdt_pluvial", libelle: "rendement potentiel pluvial (non irrigué)" },
-    { id: "besoin", libelle: "besoin en eau d'irrigation" }
-  ];
-  var couchesVariables = {};   // id de variable -> { couche: L.ImageOverlay, donnees: {...} }
-
-  function rgb(c) { return "rgb(" + c[0] + "," + c[1] + "," + c[2] + ")"; }
-
-  function majLegendesVariables() {
-    var conteneur = $("legendes-cartes-variables");
-    var actifs = VARIABLES_CARTE.filter(function (v) { return couchesVariables[v.id]; });
-    if (!actifs.length) { conteneur.hidden = true; conteneur.innerHTML = ""; return; }
-    conteneur.hidden = false;
-    conteneur.innerHTML = actifs.map(function (v) {
-      var d = couchesVariables[v.id].donnees;
-      return '<div class="legende-var"><span class="legende-var__libelle">' + d.libelle + '</span>' +
-        '<span class="legende-var__barre" style="background:linear-gradient(to right,' +
-        rgb(d.couleur_basse) + ',' + rgb(d.couleur_haute) + ')"></span>' +
-        '<span class="legende-var__valeurs">' + fmtS(d.min, 1) + ' à ' + fmtS(d.max, 1) + ' ' + d.unite +
-        (d.scenario ? ' · ' + d.scenario : '') + '</span></div>';
-    }).join("");
-  }
-
-  function retirerCoucheVariable(id) {
-    var c = couchesVariables[id];
-    if (c && c.couche && carteSimulation) { carteSimulation.carte.removeLayer(c.couche); }
-    delete couchesVariables[id];
-    majLegendesVariables();
-  }
-
-  function majEtatCasesCartesVariables() {
-    var culture = $("culture").value;
-    var dispo = CARTES_VARIABLES[culture] || {};
-    VARIABLES_CARTE.forEach(function (v) {
-      var case_ = $("carte-var-" + v.id);
-      var ok = !!dispo[v.id];
-      case_.disabled = !ok;
-      case_.title = ok ? "" : "« " + culture + " » n'a pas de carte de " + v.libelle + ".";
-      if (!ok && case_.checked) { case_.checked = false; retirerCoucheVariable(v.id); }
+  /* Tableau « Mes hypothèses » : lignes de la culture, de l'équipement et de la ressource choisis,
+     et paramètres généraux. */
+  function majHypothesesVisibles() {
+    var choix = { Cultures: $("culture").value, Equipement: $("equipement").value, Acces_ressource: $("source").value };
+    document.querySelectorAll(".ligne-hypothese").forEach(function (tr) {
+      var o = tr.dataset.objet;
+      tr.hidden = !(o === choix[tr.dataset.feuille] || o === "Général");
     });
-  }
-
-  function rafraichirCoucheVariable(id) {
-    var case_ = $("carte-var-" + id);
-    if (!case_.checked) { retirerCoucheVariable(id); return; }
-    var culture = $("culture").value;
-    fetch("/api/carte-variable/" + encodeURIComponent(culture) + "/" + encodeURIComponent(id))
-      .then(function (r) { return r.json(); }).then(function (d) {
-        retirerCoucheVariable(id);
-        if (!d.disponible || !carteSimulation) {
-          case_.checked = false;
-          case_.title = "Lecture de la carte impossible" + (d.erreur ? " (" + d.erreur + ")" : "") + ".";
-          return;
-        }
-        var couche = L.imageOverlay("data:image/png;base64," + d.png_base64, d.bounds, { opacity: 1 })
-          .addTo(carteSimulation.carte);
-        couchesVariables[id] = { couche: couche, donnees: d };
-        majLegendesVariables();
-      }).catch(function () {
-        case_.checked = false;
-        retirerCoucheVariable(id);
-      });
-  }
-
-  function rafraichirCartesVariablesActives() {
-    VARIABLES_CARTE.forEach(function (v) {
-      if ($("carte-var-" + v.id).checked) { rafraichirCoucheVariable(v.id); }
-    });
+    document.querySelectorAll(".nom-objet").forEach(function (s) { s.textContent = choix[s.dataset.feuille] || ""; });
   }
 
   /* ==========================================================================
@@ -458,6 +467,11 @@
     if (el) { el.hidden = !actif; }
     var section = $("resultats");
     if (section) { section.setAttribute("aria-busy", actif ? "true" : "false"); }
+  }
+
+  /* Corps commun à la simulation, au rapport PDF et à l'export Excel */
+  function corpsRequete() {
+    return { entrees: entrees(), surcharges: etat.surcharges, commune: etat.commune, libre: !!PAGE.libre };
   }
 
   function planifier() {
@@ -474,7 +488,7 @@
     fetch("/api/simulation", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ entrees: entrees(), surcharges: etat.surcharges, commune: etat.commune })
+      body: JSON.stringify(corpsRequete())
     }).then(function (r) { return r.json(); }).then(function (res) {
       if (ticket !== generationSimulation) { return; }
       etat.dernier = res;
@@ -492,56 +506,56 @@
      5. Affichage des résultats
      ========================================================================== */
   function afficher(res) {
-    var a = res.agro, c = res.couts, s = res.seuil, d = res.dimensionnement;
+    var a = res.agro, c = res.couts, d = res.dimensionnement;
+    var defauts = a.defauts || {};
 
-    /* --- Bilan agronomique */
-    texte("agro-rdt-irr", fmt(a.rdt_irrigue, 1));
-    texte("agro-rdt-plu", fmt(a.rdt_pluvial, 1));
-    texte("agro-besoin", fmt(a.besoin_mm, 0));
+    /* --- Bilan agronomique (champs de saisie dans le volet Cas personnel) */
+    var champSaisi = function (id) { var el = $(id); return el && el.tagName === "INPUT"; };
+    valeurCalculee("agro-rdt-irr", champSaisi("agro-rdt-irr") ? defauts.rdt_irrigue : a.rdt_irrigue, 0.1);
+    valeurCalculee("agro-rdt-plu", champSaisi("agro-rdt-plu") ? defauts.rdt_pluvial : a.rdt_pluvial, 0.1);
+    valeurCalculee("agro-besoin", champSaisi("agro-besoin") ? defauts.besoin_mm : a.besoin_mm, 1);
     texte("agro-volume", fmt(a.volume_preleve, 0));
-    /* Rendements : « Carte » indisponible (grisé) si la culture n'a pas de carte */
-    /* (bascule automatique sur « Référence », annulée dès qu'une culture avec carte est choisie) */
-    var radioCarte = $("methode-rendement-carte");
-    radioCarte.disabled = !a.carte_disponible;
-    if (!a.carte_disponible && radioCarte.checked) {
-      $("methode-rendement-reference").checked = true;
-      etat.rendementBascule = true;
-    } else if (a.carte_disponible && etat.rendementBascule) {
-      etat.rendementBascule = false;
-      radioCarte.checked = true;
-      planifier();
+
+    /* --- Mes hypothèses : réserve utile du sol et redevance, valeurs par défaut calculées */
+    var solRes = a.sol || {};
+    valeurCalculee("saisie-ru", solRes.ru_defaut, 1);
+    texte("ru-defaut", fmt(solRes.ru_defaut, 0));
+    var carteSol = solRes.carte || {};
+    texte("ru-defaut-tt", solRes.carte && carteSol.valeur !== null && carteSol.valeur !== undefined
+      ? "Carte de la réserve utile des sols (0-200 cm) : moyenne de " + carteSol.n + " maille(s) de 1 km — " +
+        carteSol.methode + "."
+      : "Valeur par défaut du référentiel : commune non sélectionnée ou non couverte par la carte des sols.");
+    valeurCalculee("saisie-profondeur", solRes.profondeur_defaut, 0.1);
+    texte("profondeur-defaut", fmt(solRes.profondeur_defaut, 1));
+    var carteProf = solRes.carte_profondeur || {};
+    texte("profondeur-defaut-tt", carteProf.valeur !== null && carteProf.valeur !== undefined
+      ? "Profondeur de sol de la BDGSF (classes 0,3 / 0,5 / 1 / 2 m) : moyenne de " + carteProf.n +
+        " maille(s) de 1 km — " + carteProf.methode + "."
+      : "Valeur par défaut du référentiel : commune non sélectionnée ou non couverte par la carte de profondeur.");
+    valeurCalculee("saisie-redevance", res.redevance.taux_defaut, 0.01);
+    texte("redevance-defaut", fmt(res.redevance.taux_defaut, 2));
+    texte("redevance-defaut-tt", res.redevance.agence
+      ? res.redevance.agence + ", catégorie " + res.redevance.categorie + " (" + (res.entrees.zre ? "ZRE" : "hors ZRE") +
+        "), eaux " + res.redevance.origine + "s" + (res.redevance.incluse ? " — comprise dans le tarif de l'ASA." : ".")
+      : "Agence de l'eau non déterminée : sélectionnez une commune.");
+    /* Source retenue automatiquement (besoin : SGPE > MAELIA > référentiel ; rendements : MAELIA >
+       référentiel, ou SGPE si la case « exploratoire » est cochée) et bulles « i » des autres méthodes */
+    var caseSgpe = $("rendement-sgpe");
+    if (caseSgpe) {
+      caseSgpe.disabled = !(a.methodes_rendement || {}).sgpe;
+      caseSgpe.parentNode.title = caseSgpe.disabled ? "Indisponible pour cette culture (Kc ou Ky non renseignés)." : "";
     }
-    aideMethode(radioCarte, a.carte_disponible ? "" : "Pas de carte de rendement pour cette culture.");
-    var dispoMethodes = a.methodes_besoin || {};
-    var indisponibles = [];
-    document.querySelectorAll('input[name="methode-besoin"]').forEach(function (r) {
-      r.disabled = dispoMethodes[r.value] === false;
-      if (r.disabled) { indisponibles.push(r.value); }
-      aideMethode(r, r.disabled ? "Indisponible pour cette culture." : "");
-    });
-    /* Besoin en eau : méthode cochée indisponible → bascule sur la première disponible
-       (SGPE, Carte, Référence), et retour à la méthode choisie dès qu'elle redevient disponible */
-    var cochee = document.querySelector('input[name="methode-besoin"]:checked');
-    if (cochee && cochee.disabled) {
-      etat.besoinChoisi = etat.besoinChoisi || cochee.value;
-      var repli = document.querySelector('input[name="methode-besoin"]:not(:disabled)');
-      if (repli) { repli.checked = true; planifier(); }
-    } else if (etat.besoinChoisi && dispoMethodes[etat.besoinChoisi] !== false) {
-      var choisi = etat.besoinChoisi;
-      etat.besoinChoisi = null;
-      if (!cochee || cochee.value !== choisi) { $("methode-besoin-" + choisi).checked = true; planifier(); }
-    }
-    var culture = res.entrees.culture;
-    texte("methode-besoin-aide", [
-      indisponibles.indexOf("sgpe") >= 0
-        ? "SGPE indisponible pour « " + culture + " » : coefficients culturaux (Kc) non renseignés." : "",
-      indisponibles.indexOf("carte") >= 0 ? "Carte indisponible pour « " + culture + " »." : ""
-    ].filter(Boolean).join(" "));
-    texte("agro-volume-cpl", "Efficience du matériel : " + pct(a.efficience, 0));
+    var sources = a.sources || {};
     var bulles = a.infobulles || {};
-    texte("agro-rdt-irr-tt", bulles.rdt_irrigue || "");
-    texte("agro-rdt-plu-tt", bulles.rdt_pluvial || "");
-    texte("agro-besoin-tt", bulles.besoin_mm || "");
+    [["agro-rdt-irr", "rdt_irrigue", "q/ha", 1], ["agro-rdt-plu", "rdt_pluvial", "q/ha", 1],
+     ["agro-besoin", "besoin_mm", "mm", 0]].forEach(function (x) {
+      html(x[0] + "-tt", bulleMethodes((a.alternatives || {})[x[1]] || [], sources[x[1]], bulles[x[1]], x[2], x[3]));
+    });
+    var libRdt = sources.rdt_irrigue === sources.rdt_pluvial ? LIBELLES_SOURCE[sources.rdt_irrigue]
+      : LIBELLES_SOURCE[sources.rdt_irrigue] + " (irrigué), " + LIBELLES_SOURCE[sources.rdt_pluvial] + " (pluvial)";
+    texte("agro-rdt-source", "Source : " + libRdt);
+    texte("agro-besoin-source", "Source : " + LIBELLES_SOURCE[sources.besoin_mm]);
+    texte("agro-volume-cpl", "Efficience du matériel : " + pct(a.efficience, 0));
     texte("agro-volume-tt", "Besoin (mm) × 10 × surface ÷ efficience d'application du matériel");
 
     var notes = a.notes || [];
@@ -553,9 +567,20 @@
     tuile.classList.toggle("indicateur--positif", res.bilan.total >= 0);
     tuile.classList.toggle("indicateur--negatif", res.bilan.total < 0);
     texte("eco-bilan", (res.bilan.total >= 0 ? "+" : "−") + fmt(Math.abs(res.bilan.total), 0));
+    var sb = res.bilan.sans_subvention.total;
+    texte("eco-bilan-sans", (sb >= 0 ? "+" : "−") + fmt(Math.abs(sb), 0));
     texte("eco-cout", fmt(c.total, 0));
     texte("eco-cout-m3", fmt(c.c_par_m3, 1));
     texte("eco-cout-ha", fmt(c.par_ha, 0));
+    texte("eco-fixes", fmt(c.fixes, 0));
+    texte("eco-fixes-part", pct(c.part_fixes, 0));
+    texte("eco-variables", fmt(c.variables, 0));
+    var barre = $("eco-barre-fixes");
+    if (barre) { barre.style.width = Math.round(c.part_fixes * 100) + "%"; }
+    texte("eco-cout-sans", fmt(c.sans_subvention.total, 0));
+    texte("eco-cout-sans-m3", fmt(c.sans_subvention.c_par_m3, 1));
+    texte("eco-cout-sans-ha", fmt(c.sans_subvention.par_ha, 0));
+    texte("eco-aide", fmt(c.aide_publique_annuelle, 0));
     texte("eco-gain", fmt(res.gain.total, 0));
     /* Δ rendement (q/ha) → t/ha (× 0,1) × prix (€/t) = gain à l'hectare, × surface = gain annuel */
     texte("eco-gain-cpl", fmtS(a.delta_rdt) + " q/ha = " + fmtS(a.delta_rdt * 0.1, 2) + " t/ha × " +
@@ -601,7 +626,7 @@
       '<div class="fr-table__container"><div class="fr-table__content"><table id="detail-capex-tableau">' +
       "<caption>Détail des investissements</caption><thead><tr><th scope=\"col\">Poste</th>" +
       "<th scope=\"col\" class=\"num\">Montant</th></tr></thead><tbody>" +
-      "<tr class=\"ligne-reste-a-charge\"><th scope=\"row\"><strong>Reste à charge pour l'agriculteur</strong></th>" +
+      "<tr class=\"ligne-reste-a-charge\"><th scope=\"row\"><strong>À la charge de l'agriculteur</strong></th>" +
       "<td class=\"num\"><strong>" + euros(res.capex.reste_a_charge, 0) + "</strong></td></tr>" +
       "<tr><th scope=\"row\">Matériel d'irrigation" +
       (d.nb_unites ? " (" + d.nb_unites + " unité" + (d.nb_unites > 1 ? "s" : "") + ")" : "") +
@@ -622,23 +647,6 @@
 
     /* --- Cascade */
     cascade.maj(res);
-
-    /* --- Seuil de rentabilité */
-    var phrase;
-    if (s.prix_min === null || s.prix_min === undefined) {
-      phrase = "Le gain de rendement étant nul, aucun prix de vente ne permet de rentabiliser l'irrigation " +
-        "par le seul différentiel de rendement.";
-    } else {
-      var ecart = s.ecart, sens = ecart >= 0 ? "au-dessous du" : "au-dessus du";
-      phrase = "<strong>Prix de vente minimal : " + fmtS(s.prix_min) + " €/t</strong>, soit " +
-        fmtS(Math.abs(ecart)) + " €/t " + sens + " prix retenu (" + fmtS(s.prix) + " €/t)" +
-        (s.prix ? ", un écart de " + fmt(Math.abs(ecart) / s.prix * 100, 0) + " %" : "") + ". ";
-      if (s.delta_min !== null && s.delta_min !== undefined) {
-        phrase += "Lecture inverse : à prix de vente constant, il faut un gain de rendement d'au moins <strong>" +
-          fmtS(s.delta_min) + " q/ha</strong> (contre actuellement " + fmtS(s.delta_actuel) + " q/ha).";
-      }
-    }
-    html("seuil-texte", phrase);
 
     /* --- Avertissements */
     var classes = { info: "fr-alert--info", warning: "fr-alert--warning", error: "fr-alert--error" };
@@ -771,6 +779,135 @@
   }
 
   /* ==========================================================================
+     8 ter. Cas personnel : rapport PDF, export et import des variables (Excel)
+     ========================================================================== */
+  function etatFichiers(t, erreur) {
+    var el = $("etat-fichiers");
+    if (!el) { return; }
+    el.textContent = t || "";
+    el.className = "fr-message" + (erreur ? " fr-message--error" : (t ? " fr-message--info" : ""));
+  }
+
+  function telechargerDepuisApi(url, nomDefaut, bouton) {
+    bouton.disabled = true;
+    etatFichiers("Préparation du fichier…");
+    fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpsRequete()) })
+      .then(function (r) {
+        if (!r.ok) { throw new Error("réponse " + r.status); }
+        var cd = r.headers.get("Content-Disposition") || "", m = /filename="([^"]+)"/.exec(cd);
+        return r.blob().then(function (b) { return { blob: b, nom: m ? m[1] : nomDefaut }; });
+      })
+      .then(function (f) {
+        var a = document.createElement("a"), lien = URL.createObjectURL(f.blob);
+        a.href = lien;
+        a.download = f.nom;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function () { URL.revokeObjectURL(lien); }, 1000);
+        etatFichiers("");
+      })
+      .catch(function (e) { etatFichiers("Téléchargement impossible : " + e.message, true); })
+      .then(function () { bouton.disabled = false; });
+  }
+
+  function cocher(nom, valeur) {
+    var r = document.querySelector('input[name="' + nom + '"][value="' + valeur + '"]');
+    if (r) { r.checked = true; }
+  }
+
+  /* Classeur relu par /api/variables-import : choix, commune et variables modifiées */
+  function appliquerImport(d) {
+    var x = d.entrees || {};
+    var options = function (id, v) {
+      return v && Array.prototype.some.call($(id).options, function (o) { return o.value === v; });
+    };
+    if (options("culture", x.culture)) { $("culture").value = x.culture; }
+    prixParDefaut();
+    if (x.prix_vente) { $("prix-vente").value = x.prix_vente; }
+    if (x.surface) { $("surface").value = x.surface; }
+    if (options("source", x.source)) { $("source").value = x.source; }
+    if (options("equipement", x.equipement)) { $("equipement").value = x.equipement; }
+    if (x.type_retenue) { cocher("type-retenue", x.type_retenue); }
+    if (x.nb_adherents) { $("nb-adherents").value = x.nb_adherents; }
+    $("capacite-auto").checked = x.capacite_auto !== false;
+    if (x.capacite) { $("capacite").value = x.capacite; }
+    $("deja-amorti").checked = !!x.deja_amorti;
+    $("deja-amorti-equipement").checked = !!x.deja_amorti_equipement;
+    $("zre").checked = !!x.zre;
+    etat.nbUnitesManuel = !!x.nb_unites;
+    if (x.nb_unites) { $("nb-unites").value = x.nb_unites; }
+    $("rendement-sgpe").checked = x.methode_rendement === "sgpe";
+    subventionsParDefaut(true);
+    [["subvention_equipement_pct", "subvention-equipement", "subvEquipementManuel"],
+     ["subvention_acces_pct", "subvention", "subvAccesManuel"]].forEach(function (c) {
+      if (x[c[0]] !== null && x[c[0]] !== undefined) {
+        $(c[1]).value = x[c[0]];
+        etat[c[2]] = true;
+        $(c[1]).classList.add("champ-param--modifie");
+      }
+    });
+    etat.surcharges = d.surcharges || {};
+    etat.saisies = {};
+    ["ru_mm", "profondeur_sol_m", "redevance_c_m3"].forEach(function (cle) {
+      if (x[cle] !== null && x[cle] !== undefined) { etat.saisies[cle] = x[cle]; }
+    });
+    synchroniserChamps(null);
+    majBlocs();
+    var c = d.commune || {};
+    if (!c.code) {
+      if (options("agence", x.agence)) { $("agence").value = x.agence; }
+      simuler();
+      return;
+    }
+    fetch(API_GEO + "/" + encodeURIComponent(c.code) + "?fields=" + CHAMPS)
+      .then(function (r) { if (!r.ok) { throw new Error(); } return r.json(); })
+      .then(function (g) {
+        etat.commune = { code: g.code, nom: g.nom, departement: g.codeDepartement,
+                         centre: g.centre ? g.centre.coordinates : null, contour: g.contour || null };
+        $("commune-recherche").value = g.nom + " (" + g.codeDepartement + ")";
+        if (carteSimulation) { carteSimulation.montrer(etat.commune); }
+        return appliquerAgence(g.codeDepartement);
+      })
+      .catch(function () {
+        texte("commune-etat", "Commune du classeur introuvable (" + (c.nom || c.code) + ") : recherchez-la à nouveau.");
+      })
+      .then(function () {
+        /* L'agence enregistrée prime sur celle déduite du département (circonscription corrigée à la main) */
+        if (options("agence", x.agence)) { $("agence").value = x.agence; }
+        simuler();
+      });
+  }
+
+  function brancherCasPersonnel() {
+    if (!$("telecharger-pdf")) { return; }
+    $("telecharger-pdf").addEventListener("click", function () {
+      telechargerDepuisApi("/api/rapport-pdf", "irrigation-rapport.pdf", this);
+    });
+    $("telecharger-variables").addEventListener("click", function () {
+      telechargerDepuisApi("/api/variables-excel", "irrigation-variables.xlsx", this);
+    });
+    $("importer-variables").addEventListener("click", function () { $("fichier-variables").click(); });
+    $("fichier-variables").addEventListener("change", function () {
+      var f = this.files[0];
+      if (!f) { return; }
+      var donnees = new FormData();
+      donnees.append("fichier", f);
+      etatFichiers("Lecture du classeur…");
+      fetch("/api/variables-import", { method: "POST", body: donnees })
+        .then(function (r) { return r.json().then(function (j) { if (!r.ok) { throw new Error(j.erreur); } return j; }); })
+        .then(function (d) {
+          appliquerImport(d);
+          var n = Object.keys(d.surcharges || {}).length;
+          etatFichiers("Classeur « " + f.name + " » importé : " + n + " variable" + (n > 1 ? "s" : "") +
+            " modifiée" + (n > 1 ? "s" : "") + ".");
+        })
+        .catch(function (e) { etatFichiers(e.message || "Classeur illisible.", true); })
+        .then(function () { $("fichier-variables").value = ""; });
+    });
+  }
+
+  /* ==========================================================================
      9. Démarrage
      ========================================================================== */
   document.addEventListener("DOMContentLoaded", function () {
@@ -780,6 +917,8 @@
     brancherParametres();
     brancherOnglets();
     brancherExportsTableaux();
+    brancherCasPersonnel();
+    brancherChampsCalcules();
     majDureeVieEquipementSim = brancherDureeVieObjet({
       idNom: "duree-vie-equipement-nom", idValeur: "duree-vie-equipement-sim", idAide: "duree-vie-equipement-sim-aide",
       idSelecteur: "equipement", feuille: "Equipement", selecteurTableau: "#table-equipements",
@@ -795,27 +934,16 @@
       .forEach(function (id) {
         $(id).addEventListener("change", function () {
           if (id === "source") { subventionsParDefaut(false); }
-          if (id === "culture") {
-            prixParDefaut();
-            majEtatCasesCartesVariables();
-            rafraichirCartesVariablesActives();
-          }
+          if (id === "culture") { prixParDefaut(); }
           if (id === "surface") { etat.nbUnitesManuel = false; }
           planifier();
         });
       });
-    VARIABLES_CARTE.forEach(function (v) {
-      $("carte-var-" + v.id).addEventListener("change", function () { rafraichirCoucheVariable(v.id); });
-    });
-    ["zre", "deja-amorti", "deja-amorti-equipement", "capacite-auto"].forEach(function (id) {
+    ["zre", "deja-amorti", "deja-amorti-equipement", "capacite-auto", "rendement-sgpe"].forEach(function (id) {
       $(id).addEventListener("change", planifier);
     });
-    document.querySelectorAll('input[name="type-retenue"], input[name="methode-besoin"], input[name="methode-rendement"]').forEach(function (r) {
-      r.addEventListener("change", function () {
-        if (r.name === "methode-rendement") { etat.rendementBascule = false; }
-        if (r.name === "methode-besoin") { etat.besoinChoisi = null; }
-        planifier();
-      });
+    document.querySelectorAll('input[name="type-retenue"]').forEach(function (r) {
+      r.addEventListener("change", planifier);
     });
     $("nb-unites").addEventListener("change", function () { etat.nbUnitesManuel = true; planifier(); });
     $("prix-retablir").addEventListener("click", function () { prixParDefaut(); planifier(); });
@@ -826,9 +954,6 @@
         $(c[0]).classList.toggle("champ-param--modifie", etat[c[1]]);
         planifier();
       });
-    });
-    document.querySelectorAll('input[name="source-prix"]').forEach(function (r) {
-      r.addEventListener("change", function () { prixParDefaut(); planifier(); });
     });
 
     $("export-png").addEventListener("click", function () {
