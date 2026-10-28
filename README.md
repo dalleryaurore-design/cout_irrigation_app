@@ -170,6 +170,40 @@ d'environnement `IRRIG_COMMUNE_DEFAUT`, `IRRIG_DEPARTEMENT_DEFAUT`, `IRRIG_CULTU
   simulation ; l'API `GET /api/carte-variable/<culture>/<variable>` (image PNG, voir
   `moteur/cartes.py::carte_variable`) reste disponible.
 
+**Diagnostic du territoire** (sous le formulaire, `moteur/territoire.py`). Quatre fiches d'indicateurs pour la
+commune, classés favorable / vigilance / défavorable d'après les seuils de la feuille `Territoire` du référentiel,
+source au survol :
+- *Tension sur la ressource* : part de la commune en ZRE (Sandre), jours de restriction sécheresse par an
+  (moyenne 2016-2025, VigiEau), SAGE ;
+- *Usages concurrents et ouvrages* : ouvrages hydroélectriques, d'eau potable et d'irrigation (ROE), part de la
+  SAU irriguée en 2020 (Agreste) ;
+- *Sol et sous-sol* : réserve utile et profondeur de la simulation, formation affleurante (BDLISA) ;
+- *Projections hydroclimatiques* (RCP4.5, 2021-2050 → 2041-2070 → 2071-2100) : besoin en eau de la culture
+  (méthode SGPE) et bilan P − ETP d'avril à septembre et excédent hivernal (`climate_data.xlsx`, DRIAS) ;
+  changement du débit d'étiage (QMNA), d'été et d'hiver par rapport à 1976-2005 à la station Explore2 la plus
+  proche (médiane et fourchette 10-90 % des simulations, chaînes aberrantes exclues). Les débits sont classés à
+  l'horizon 2041-2070 (durée d'amortissement des ouvrages) et pèsent sur le classement du pompage en cours
+  d'eau (étiage) et de la retenue par pompage (hiver) ; recharge potentielle annuelle de la masse d'eau
+  souterraine (Explore2, modèle RECHARGE, 17 projections) aux niveaux de réchauffement de la TRACC +2 / +2,7 /
+  +4 °C par rapport à 1976-2005, classée à +2,7 °C et prise en compte pour le forage ;
+- *Accès à l'eau* : cours d'eau permanent, cours d'eau de plus de 5 m et canal les plus proches (BD TOPAGE),
+  première nappe (BDLISA), puis classement des types d'accès du référentiel ; le bouton « Simuler avec… »
+  applique le mieux classé. Distances mesurées depuis un point intérieur de la commune ; relief non pris en compte.
+
+Au choix de la commune, l'agence de l'eau est déduite du **bassin** (circonscriptions Sandre), et non plus du
+département, et la case ZRE est cochée si la commune est en ZRE pour l'origine de l'eau prélevée (souterraine pour
+un forage, superficielle sinon), tant que l'utilisateur ne l'a pas modifiée. Une ZRE souterraine peut ne viser
+qu'une nappe captive profonde (Albien) : son nom est rappelé sous la case.
+
+Les indicateurs sont lus dans `territoire/indicateurs_communes.csv` (déployé), produit à partir des données brutes
+de `territoire/brut/` (non déployées, liste dans l'en-tête du script) par :
+
+    python outils/preparer_territoire.py            # toutes les étapes (une dizaine de minutes)
+    python outils/preparer_territoire.py nappes     # une étape, puis l'assemblage
+
+(dépendances de préparation seulement : `pip install geopandas pyogrio pandas`). La feuille `Territoire` et les
+références des données ont été ajoutées par `outils/ajouter_parametres_territoire.py` (script ponctuel).
+
 **Onglets Équipement, Accès à la ressource, Ressources.** Les hypothèses en coulisse.
 Les valeurs marquées « Variable » dans le référentiel sont des champs de saisie : leur
 modification s'applique immédiatement à la simulation et le champ se souligne en bleu.
@@ -410,9 +444,12 @@ coût de construction au m³ stocké.
 - **Durées de vie** : 15 ans pour les équipements et 30 ans pour l'accès à la ressource,
   conformément à la commande, alors que la source d'origine amortit les matériels sur 9 à
   13 ans. L'écart est mentionné dans les info-bulles.
-- **Agence de l'eau** : déduite du département, alors que les circonscriptions suivent les
-  bassins versants. Corrigeable dans la liste déroulante. Le classement en ZRE est saisi
-  par l'utilisateur, faute de couche de référence embarquée.
+- **Agence de l'eau et ZRE** : déduites de la commune (bassin et zones de répartition des eaux du Sandre,
+  voir « Diagnostic du territoire ») ; à défaut de données pour la commune, agence déduite du département.
+  Corrigeables dans le formulaire.
+- **Diagnostic du territoire** : échelle communale (point intérieur de la commune pour les distances), relief
+  et périmètres des ASA non pris en compte ; restrictions au niveau le plus sévère des zones d'alerte qui
+  touchent la commune.
 - **Cartes** : un seul narratif climatique ne représente pas l'incertitude. Les valeurs
   communales sont des moyennes de mailles de 8 km et ne valent pas à l'échelle parcellaire.
 - **Effet rebond** : l'amélioration de l'efficience réduit le volume prélevé à surface
@@ -480,6 +517,7 @@ remboursé, la redevance et les routes de l'application.
 | `IRRIG_CARTES` | `carte-violet/` | autre dossier de cartes |
 | `IRRIG_CLIMAT` | `climate_data.xlsx` | données ETP / précipitations de la méthode SGPE |
 | `IRRIG_SOL_RU` | `sol/ru_sol_1km.tif` | carte de réserve utile du sol (mm) ; à défaut, `AWCr_mm_0_200.tif` |
+| `IRRIG_TERRITOIRE` | `territoire/indicateurs_communes.csv` | indicateurs du diagnostic du territoire |
 | `IRRIG_HORIZON_CLIMAT` | `H1` | horizon climatique de la méthode SGPE (`H1`, `H2` ou `H3`) |
 | `IRRIG_COMMUNE_DEFAUT` | `76890` | code postal/INSEE pré-rempli à l'ouverture de la page Projet |
 | `IRRIG_DEPARTEMENT_DEFAUT` | `76` | département pré-rempli (départage les homonymes) |

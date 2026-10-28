@@ -13,3 +13,6 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+
+# Données brutes du diagnostic du territoire (plusieurs Go) : l'application lit territoire/indicateurs_communes.csv
+territoire/brut/

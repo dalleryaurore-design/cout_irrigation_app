@@ -34,6 +34,9 @@ SOL_RU_ORIGINE = os.path.join(RACINE, "AWCr_mm_0_200.tif")
 # Profondeur de sol (m) : couche BDGSF bdgsf_classe_prof rasterisée à 1 km par outils/preparer_profondeur.R
 SOL_PROFONDEUR = os.environ.get("IRRIG_SOL_PROFONDEUR", os.path.join(RACINE, "sol", "profondeur_sol_1km.tif"))
 
+# Indicateurs territoriaux par commune (diagnostic du territoire), produits par outils/preparer_territoire.py
+TERRITOIRE = os.environ.get("IRRIG_TERRITOIRE", os.path.join(RACINE, "territoire", "indicateurs_communes.csv"))
+
 # Résultats de la validation des méthodes (outils/comparer_modeles.py) : onglet Références et méthodologie PDF
 VALIDATION = os.environ.get("IRRIG_VALIDATION", os.path.join(RACINE, "validation", "comparaison.csv"))
 

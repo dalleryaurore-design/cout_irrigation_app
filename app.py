@@ -50,7 +50,7 @@ from flask import (Flask, Response, abort, jsonify, redirect, render_template, r
                    url_for)
 
 import config
-from moteur import cartes, climat, export, methodologie, rapport, sol, validation
+from moteur import cartes, climat, export, methodologie, rapport, sol, territoire, validation
 from moteur.calcul import (POSTES, COULEUR_BILAN, COULEUR_GAIN, code_prix, simuler, taux_subvention_acces,
                            type_source, valeurs_derivees)
 from moteur.referentiel import CLE_LIBRE, GestionnaireReferentiel, slug
@@ -493,6 +493,21 @@ def _preparer(ref, corps):
     return e, surcharges, commune
 
 
+def _projections(ref, e, commune, agro):
+    """Projections climatiques de la commune (RCP4.5, horizons H1 à H3) : bilan P − ETP et besoin en eau
+    de la culture par la méthode SGPE, avec le sol de la simulation."""
+    lonlat = tuple(commune["centre"]) if commune and commune.get("centre") else None
+    clim = climat.bilan_climatique(lonlat, config.CLIMAT)
+    if clim is None:
+        return None
+    for h, v in clim["horizons"].items():
+        b = climat.besoin_sgpe(ref, e["culture"], lonlat, config.CLIMAT, h, e.get("surcharges"),
+                               agro["sol"]["ru"], agro["sol"]["profondeur"])
+        v["besoin_mm"] = b["valeur"]
+    clim["culture"] = e["culture"]
+    return clim
+
+
 def _simulation(ref, corps):
     e, surcharges, commune = _preparer(ref, corps)
     agro = _valeurs_agro(ref, e, commune)
@@ -503,6 +518,10 @@ def _simulation(ref, corps):
                         "methodes_rendement": agro["methodes_rendement"],
                         "sgpe": agro.get("sgpe"), "horizon": agro["horizon"], "defauts": agro["defauts"],
                         "sol": agro["sol"], "alternatives": agro["alternatives"], "sources": agro["sources"]})
+    res["territoire"] = territoire.diagnostic(ref, config.TERRITOIRE, (commune or {}).get("code", ""),
+                                              {"ru": agro["sol"]["ru"], "origine": agro["sol"]["origine"],
+                                               "profondeur": agro["sol"]["profondeur"]}, e["source"], surcharges,
+                                              _projections(ref, e, commune, agro))
     res["avertissements"] = [{"niveau": "warning", "texte": t} for t in agro["alertes"]] + res["avertissements"]
     res["entrees"] = {k: v for k, v in e.items() if k != "surcharges"}
     res["referentiel"] = {"date": ref.date_modification, "anomalies": ref.anomalies[:20],
@@ -578,6 +597,14 @@ def api_departement(code):
     ref = REF.get()
     d = ref.departements.get(code.upper().zfill(2))
     return jsonify(d or {})
+
+
+@app.get("/api/territoire/<code>")
+def api_territoire(code):
+    """Agence de l'eau (bassin) et parts de la commune en ZRE, appliquées au formulaire au choix de la commune."""
+    ref = REF.get()
+    d = territoire.diagnostic(ref, config.TERRITOIRE, code)
+    return jsonify({k: d.get(k) for k in ("disponible", "agence", "agence_source", "zre")})
 
 
 @app.get("/api/carte-variable/<culture>/<variable>")

@@ -212,3 +212,11 @@
   border: 1px solid var(--border-default-grey); background: var(--background-default-grey);
 }
 .methode__carte h4 { display: flex; align-items: center; }
+
+/* ------------------------------------------- Diagnostic du territoire */
+.territoire__liste, .territoire__options { margin: 0; padding-left: 0; list-style: none; }
+.territoire__options { padding-left: 1.25rem; list-style: decimal; }
+.territoire__ligne, .territoire__options li { font-size: .875rem; margin-bottom: .5rem; padding-bottom: 0; }
+.territoire__ligne .fr-badge, .territoire__options .fr-badge { vertical-align: middle; margin-right: .25rem; }
+.territoire__libelle { color: var(--text-mention-grey); }
+.territoire__motifs { color: var(--text-mention-grey); font-size: .8125rem; }

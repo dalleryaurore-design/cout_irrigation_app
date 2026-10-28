@@ -302,6 +302,29 @@ def rendement_relatif(ky: float, satisfaction: float) -> float:
     return max(min(1.0 - ky * (1.0 - satisfaction), 1.0), 0.0)
 
 
+def bilan_climatique(lonlat: Optional[Tuple[float, float]], chemin: str) -> Optional[Dict[str, Any]]:
+    """Bilan climatique P − ETP au point de grille le plus proche, par horizon : déficit de la saison
+    d'irrigation (avril à septembre) et excédent hivernal (somme des mois d'octobre à mars où P > ETP,
+    eau disponible pour la recharge et le remplissage des retenues). None sans donnée à proximité."""
+    d = _charger(chemin) if lonlat is not None else None
+    if d is None or not len(d["coords"]):
+        return None
+    i, dist = point_proche(d, lonlat)
+    if dist > DISTANCE_MAX_KM:
+        return None
+    ete, hiver = range(3, 9), (9, 10, 11, 0, 1, 2)
+    res = {"point": str(d["ids"][i]), "distance_km": dist, "horizons": {}}
+    for h, nom in enumerate(HORIZONS):
+        p, e = d["pluie"][i, h], d["etp"][i, h]
+        if not (np.all(np.isfinite(p)) and np.all(np.isfinite(e))):
+            return None
+        res["horizons"][nom] = {"p_ete": float(sum(p[m] for m in ete)), "etp_ete": float(sum(e[m] for m in ete)),
+                                "bilan_ete": float(sum(p[m] - e[m] for m in ete)),
+                                "excedent_hiver": float(sum(max(p[m] - e[m], 0.0) for m in hiver)),
+                                "p_annuel": float(p.sum())}
+    return res
+
+
 def besoin_sgpe(ref, culture: str, lonlat: Optional[Tuple[float, float]], chemin: str,
                 horizon: str = "H1", surcharges: Optional[Dict[str, Any]] = None,
                 ru: Optional[float] = None, profondeur: Optional[float] = None) -> Dict[str, Any]:

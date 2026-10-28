@@ -525,6 +525,35 @@ class TestRoutes(unittest.TestCase):
         self.assertEqual(saisi["agro"]["methode_besoin"], "saisie")
         self.assertIn("besoin_mm", saisi["agro"]["defauts"])
 
+    def test_diagnostic_du_territoire(self):
+        """Indicateurs de la commune (territoire/indicateurs_communes.csv) : agence du bassin, ZRE, quatre fiches,
+        types d'accès du référentiel classés ; commune inconnue : diagnostic indisponible, sans erreur."""
+        if not os.path.exists(config.TERRITOIRE):
+            self.skipTest("territoire/indicateurs_communes.csv absent (outils/preparer_territoire.py)")
+        t = self.client.get("/api/territoire/45252").get_json()  # Pithiviers : Beauce, ZRE souterraine
+        self.assertTrue(t["disponible"])
+        self.assertIn(t["agence"], REF.agences)
+        self.assertGreaterEqual(t["zre"]["sout"], t["zre"]["seuil"])
+        commune = {"code": "45252", "nom": "Pithiviers", "departement": "45", "centre": [2.25, 48.17], "contour": None}
+        r = self.client.post("/api/simulation", json={"entrees": entrees(), "commune": commune}).get_json()
+        d = r["territoire"]
+        self.assertEqual([f["id"] for f in d["fiches"]], ["tension", "usages", "sol", "projections", "acces"])
+        projections = {x["libelle"]: x["valeur"] for x in d["fiches"][3]["indicateurs"]}
+        self.assertIn("Débit d'étiage (QMNA)", projections)  # station Explore2 de l'Œuf, à 2 km
+        self.assertTrue(any(k.startswith("Besoin en eau") for k in projections))  # SGPE, trois horizons
+        self.assertEqual(projections["Débit d'étiage (QMNA)"].count("→"), 2)
+        self.assertTrue(projections["Recharge des nappes"].endswith("% (+2 → +2,7 → +4 °C)"))  # craie et Beauce
+        acces = d["fiches"][-1]
+        self.assertEqual({o["source"] for o in acces["options"]}, set(REF.sources))
+        self.assertEqual(sum(o["retenue"] for o in acces["options"]), 1)
+        for f in d["fiches"]:
+            for x in f["indicateurs"]:
+                self.assertIn(x["niveau"], ("favorable", "vigilance", "defavorable", "info"), x["libelle"])
+                self.assertTrue(x["bulle"], x["libelle"])
+        self.assertFalse(self.client.get("/api/territoire/00000").get_json()["disponible"])
+        r = self.client.post("/api/simulation", json={"entrees": entrees()}).get_json()
+        self.assertFalse(r["territoire"]["disponible"])
+
     def test_rendement_sgpe_et_profondeur_de_sol(self):
         """Rendement pluvial SGPE = Ym × (1 − Ky (1 − ETa/ETc)) ; profondeur de sol de la carte ou saisie."""
         commune = {"code": "40192", "nom": "Mont-de-Marsan", "departement": "40", "centre": [-0.5, 43.89],

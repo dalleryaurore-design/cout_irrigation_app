@@ -23,7 +23,7 @@ from typing import Any, Dict, List, Optional
 
 from openpyxl import load_workbook
 
-FEUILLES_PARAMETRES = ["Cultures", "Equipement", "Acces_ressource", "Ressources"]
+FEUILLES_PARAMETRES = ["Cultures", "Equipement", "Acces_ressource", "Ressources", "Territoire"]
 
 # Clé spéciale des surcharges : présente et vraie, elle rend modifiables tous les paramètres
 # (volet « Cas personnel »), sans la restriction « Variable = oui » ni les bornes Min / Max.

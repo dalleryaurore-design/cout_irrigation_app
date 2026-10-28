@@ -24,16 +24,18 @@
               <div class="fr-fieldset__element fr-fieldset__element--inline-grow">
                 <div class="fr-select-group">
                   <label class="fr-label" for="agence">Agence de l'eau</label>
-                  <select class="fr-select" id="agence">
+                  <select class="fr-select" id="agence" aria-describedby="agence-aide">
                     <option value="">– Aucune (pas de redevance calculée) –</option>
                     {% for a in ref.agences %}<option value="{{ a }}" {% if loop.first %}selected{% endif %}>{{ a }}</option>{% endfor %}
                   </select>
+                  <p class="fr-hint-text fr-mt-1v" id="agence-aide"></p>
                 </div>
               </div>
               <div class="fr-fieldset__element">
                 <div class="fr-checkbox-group fr-checkbox-group--sm">
-                  <input type="checkbox" id="zre">
-                  <label class="fr-label" for="zre">Commune située en zone de répartition des eaux (ZRE)</label>
+                  <input type="checkbox" id="zre" aria-describedby="zre-aide">
+                  <label class="fr-label" for="zre">Commune située en zone de répartition des eaux (ZRE)
+                    <span class="fr-hint-text" id="zre-aide"></span></label>
                 </div>
               </div>
             </fieldset>
@@ -214,6 +216,15 @@
           </div>
         </div>
       </div>
+
+      {# ------------------------ Diagnostic du territoire ------------------------ #}
+      <section id="diagnostic-territoire" class="fr-mt-5w" aria-labelledby="titre-territoire">
+        <h2 class="fr-h4 titre-section" id="titre-territoire">Diagnostic du territoire</h2>
+        <p class="fr-text--sm texte-mention">Contexte de la commune : tension sur la ressource, usages concurrents, sol et
+          accès à l'eau. Source et méthode au survol de chaque valeur ; seuils de classement dans la feuille
+          « Territoire » du référentiel.</p>
+        <div id="territoire-contenu"><p class="fr-text--sm">Sélectionnez une commune.</p></div>
+      </section>
 
       {# ------------------- Mes hypothèses (volet Cas personnel) ------------------- #}
       {% if libre and hypotheses %}

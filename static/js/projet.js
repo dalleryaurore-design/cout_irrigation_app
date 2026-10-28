@@ -138,7 +138,91 @@
     $("commune-recherche").setAttribute("aria-expanded", "false");
     texte("commune-etat", "");
     if (carteSimulation) { carteSimulation.montrer(etat.commune); }
-    appliquerAgence(c.codeDepartement).then(simuler);
+    appliquerTerritoire(c.code, c.codeDepartement).then(simuler);
+  }
+
+  /* Agence de l'eau déduite du bassin et ZRE de la commune (territoire/indicateurs_communes.csv) ;
+     à défaut, agence déduite du département */
+  function appliquerTerritoire(code, dep) {
+    etat.territoire = null;
+    return fetch("/api/territoire/" + encodeURIComponent(code)).then(function (r) { return r.json(); })
+      .then(function (t) {
+        if (!t || !t.disponible) { return appliquerAgence(dep); }
+        etat.territoire = t;
+        if (t.agence) {
+          $("agence").value = t.agence;
+          texte("agence-aide", "Déduite du bassin de la commune (" + t.agence_source + "). Modifiable.");
+        } else {
+          return appliquerAgence(dep);
+        }
+      })
+      .catch(function () { return appliquerAgence(dep); })
+      .then(zreParDefaut);
+  }
+
+  /* Case ZRE cochée par défaut si la commune est en ZRE pour l'origine de l'eau prélevée (souterraine pour
+     un forage, superficielle sinon), tant que l'utilisateur ne l'a pas modifiée */
+  function zreParDefaut() {
+    var t = etat.territoire;
+    if (!t || !t.zre) { texte("zre-aide", ""); return; }
+    var forage = ($("source").selectedOptions[0] || {}).dataset.type === "forage";
+    var part = forage ? t.zre.sout : t.zre.sup;
+    if (!etat.zreManuel) { $("zre").checked = part >= t.zre.seuil; }
+    texte("zre-aide", "Part de la commune en ZRE : eaux superficielles " + fmt(t.zre.sup * 100, 0) +
+      " %, souterraines " + fmt(t.zre.sout * 100, 0) + " %" + (t.zre.noms ? " (" + t.zre.noms + ")" : "") +
+      (etat.zreManuel ? "." : " — case renseignée pour les eaux " + (forage ? "souterraines" : "superficielles") +
+      " (Sandre)" + (forage && part >= t.zre.seuil ? " : à décocher si la ZRE vise une autre nappe que celle captée." : ".")));
+  }
+
+  /* Diagnostic du territoire renvoyé par la simulation : quatre fiches d'indicateurs */
+  var BADGES = { favorable: ["success", "Favorable"], vigilance: ["warning", "Vigilance"],
+                 defavorable: ["error", "Défavorable"], info: ["info", "Information"] };
+  function badge(niveau) {
+    var b = BADGES[niveau] || BADGES.info;
+    return '<span class="fr-badge fr-badge--sm fr-badge--no-icon fr-badge--' + b[0] + '">' + b[1] + "</span>";
+  }
+  var compteurBulles = 0;
+  function afficherTerritoire(t) {
+    if (!t || !t.disponible) {
+      html("territoire-contenu", '<p class="fr-text--sm">' + echapper(t ? t.message : "Sélectionnez une commune.") + "</p>");
+      return;
+    }
+    var fiches = t.fiches.map(function (f) {
+      var lignes = f.indicateurs.map(function (x) {
+        var id = "terr-tt-" + (++compteurBulles);
+        return '<li class="territoire__ligne">' + badge(x.niveau) + ' <span class="territoire__libelle">' +
+          echapper(x.libelle) + '</span> : <span class="valeur-sourcee" tabindex="0" aria-describedby="' + id + '">' +
+          echapper(x.valeur) + '</span><span class="fr-tooltip fr-placement" id="' + id +
+          '" role="tooltip" aria-hidden="true">' + echapper(x.bulle) + "</span></li>";
+      }).join("");
+      var options = "";
+      if (f.options) {
+        options = '<p class="indicateur__libelle fr-mt-2w">Type d\'accès le plus probable</p><ol class="territoire__options">' +
+          f.options.map(function (o) {
+            return "<li>" + badge(o.niveau) + " <strong>" + echapper(o.source) + "</strong>" +
+              (o.retenue ? " <em>(simulé)</em>" : "") + ' <span class="territoire__motifs">— ' +
+              echapper(o.motifs.join(" ; ")) + "</span></li>";
+          }).join("") + "</ol>" +
+          (f.proposee && !f.options.filter(function (o) { return o.retenue && o.source === f.proposee; }).length
+            ? '<button type="button" class="fr-btn fr-btn--sm fr-btn--secondary fr-mt-1w" id="territoire-appliquer" ' +
+              'data-source="' + echapper(f.proposee) + '">Simuler avec « ' + echapper(f.proposee) + " »</button>" : "");
+      }
+      return '<div class="fr-col-12 fr-col-md-6"><div class="indicateur territoire"><p class="indicateur__libelle ' +
+        'indicateur__titre">' + echapper(f.titre) + '</p><ul class="territoire__liste">' +
+        (lignes || '<li class="territoire__ligne">Aucune donnée pour cette commune.</li>') + "</ul>" + options +
+        (f.avertissement ? '<p class="fr-text--xs texte-mention fr-mt-1w fr-mb-0">' + echapper(f.avertissement) + "</p>" : "") +
+        "</div></div>";
+    }).join("");
+    html("territoire-contenu", '<div class="fr-grid-row fr-grid-row--gutters">' + fiches + "</div>");
+    var bouton = $("territoire-appliquer");
+    if (bouton) {
+      bouton.addEventListener("click", function () {
+        $("source").value = bouton.dataset.source;
+        subventionsParDefaut(false);
+        zreParDefaut();
+        planifier();
+      });
+    }
   }
 
   /* Agence de l'eau déduite du département (feuille « Departements » du référentiel) */
@@ -561,6 +645,7 @@
     var notes = a.notes || [];
     html("notes-agro", notes.length
       ? '<div class="fr-alert fr-alert--info fr-alert--sm"><p>' + notes.join("<br>") + "</p></div>" : "");
+    afficherTerritoire(res.territoire);
 
     /* --- Bilan économique */
     var tuile = $("tuile-bilan");
@@ -742,6 +827,7 @@
     subventionsParDefaut(true);
     $("equipement").value = x.equipement;
     $("zre").checked = !!x.zre;
+    etat.zreManuel = true;  /* la ZRE de l'exemple prime sur celle déduite de la commune */
     if (x.retenue === "collective") {
       $("retenue-collective").checked = true;
       $("nb-adherents").value = x.nb_adherents || 10;
@@ -835,6 +921,7 @@
     $("deja-amorti").checked = !!x.deja_amorti;
     $("deja-amorti-equipement").checked = !!x.deja_amorti_equipement;
     $("zre").checked = !!x.zre;
+    etat.zreManuel = true;
     etat.nbUnitesManuel = !!x.nb_unites;
     if (x.nb_unites) { $("nb-unites").value = x.nb_unites; }
     $("rendement-sgpe").checked = x.methode_rendement === "sgpe";
@@ -867,7 +954,7 @@
                          centre: g.centre ? g.centre.coordinates : null, contour: g.contour || null };
         $("commune-recherche").value = g.nom + " (" + g.codeDepartement + ")";
         if (carteSimulation) { carteSimulation.montrer(etat.commune); }
-        return appliquerAgence(g.codeDepartement);
+        return appliquerTerritoire(g.code, g.codeDepartement);
       })
       .catch(function () {
         texte("commune-etat", "Commune du classeur introuvable (" + (c.nom || c.code) + ") : recherchez-la à nouveau.");
@@ -933,7 +1020,7 @@
     ["culture", "surface", "source", "equipement", "agence", "nb-adherents", "capacite", "prix-vente"]
       .forEach(function (id) {
         $(id).addEventListener("change", function () {
-          if (id === "source") { subventionsParDefaut(false); }
+          if (id === "source") { subventionsParDefaut(false); zreParDefaut(); }
           if (id === "culture") { prixParDefaut(); }
           if (id === "surface") { etat.nbUnitesManuel = false; }
           planifier();
@@ -942,6 +1029,7 @@
     ["zre", "deja-amorti", "deja-amorti-equipement", "capacite-auto", "rendement-sgpe"].forEach(function (id) {
       $(id).addEventListener("change", planifier);
     });
+    $("zre").addEventListener("change", function () { etat.zreManuel = true; zreParDefaut(); });
     document.querySelectorAll('input[name="type-retenue"]').forEach(function (r) {
       r.addEventListener("change", planifier);
     });
