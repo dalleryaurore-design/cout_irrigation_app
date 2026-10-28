@@ -6,8 +6,8 @@
         <div class="fr-col-12 fr-col-lg-6">
           <form id="formulaire" class="formulaire-projet" novalidate onsubmit="return false">
 
-            <fieldset class="fr-fieldset" aria-labelledby="leg-localisation">
-              <legend class="fr-fieldset__legend" id="leg-localisation">Localisation</legend>
+            <fieldset class="fr-fieldset bloc-parametre" aria-labelledby="leg-localisation">
+              <legend class="fr-fieldset__legend" id="leg-localisation"><span class="etiquette-bloc">Localisation</span></legend>
               <div class="fr-fieldset__element">
                 <div class="fr-input-group recherche-commune">
                   <label class="fr-label" for="commune-recherche">Commune</label>
@@ -40,8 +40,8 @@
               </div>
             </fieldset>
 
-            <fieldset class="fr-fieldset" aria-labelledby="leg-culture">
-              <legend class="fr-fieldset__legend" id="leg-culture">Culture</legend>
+            <fieldset class="fr-fieldset bloc-parametre" aria-labelledby="leg-culture">
+              <legend class="fr-fieldset__legend" id="leg-culture"><span class="etiquette-bloc">Culture</span></legend>
               <div class="fr-fieldset__element">
                 <div class="fr-select-group">
                   <label class="fr-label" for="culture">Culture irriguée</label>
@@ -74,14 +74,14 @@
               </div>
             </fieldset>
 
-            <fieldset class="fr-fieldset" aria-labelledby="leg-source">
-              <legend class="fr-fieldset__legend entete-bloc" id="leg-source">
-                <span>Source de l'eau</span>
-                <span class="fr-checkbox-group fr-checkbox-group--sm choix-discret">
+            <fieldset class="fr-fieldset bloc-parametre" aria-labelledby="leg-source">
+              <legend class="fr-fieldset__legend" id="leg-source"><span class="etiquette-bloc">Source de l'eau</span></legend>
+              <div class="fr-fieldset__element bloc-parametre__option">
+                <div class="fr-checkbox-group fr-checkbox-group--sm choix-discret">
                   <input type="checkbox" id="deja-amorti">
                   <label class="fr-label" for="deja-amorti">Infrastructure déjà amortie</label>
-                </span>
-              </legend>
+                </div>
+              </div>
               <div class="fr-fieldset__element">
                 <div class="fr-select-group">
                   <label class="fr-label fr-sr-only" for="source">Source de l'eau</label>
@@ -151,14 +151,14 @@
               </div>
             </fieldset>
 
-            <fieldset class="fr-fieldset" aria-labelledby="leg-equipement">
-              <legend class="fr-fieldset__legend entete-bloc" id="leg-equipement">
-                <span>Équipement</span>
-                <span class="fr-checkbox-group fr-checkbox-group--sm choix-discret">
+            <fieldset class="fr-fieldset bloc-parametre" aria-labelledby="leg-equipement">
+              <legend class="fr-fieldset__legend" id="leg-equipement"><span class="etiquette-bloc">Équipement</span></legend>
+              <div class="fr-fieldset__element bloc-parametre__option">
+                <div class="fr-checkbox-group fr-checkbox-group--sm choix-discret">
                   <input type="checkbox" id="deja-amorti-equipement">
                   <label class="fr-label" for="deja-amorti-equipement">Matériel déjà amorti</label>
-                </span>
-              </legend>
+                </div>
+              </div>
               <div class="fr-fieldset__element fr-fieldset__element--inline-grow">
                 <div class="fr-select-group">
                   <label class="fr-label" for="equipement">Type</label>
@@ -187,24 +187,23 @@
                   </section>
                 </div>
               </div>
-              <div class="fr-fieldset__element">
-                <fieldset class="fr-fieldset fr-mb-0" aria-labelledby="leg-subventions">
-                  <legend class="fr-fieldset__legend" id="leg-subventions">Subvention publique</legend>
-                  <div class="fr-fieldset__element fr-fieldset__element--inline fr-fieldset__element--inline-grow">
-                    <div class="fr-input-group">
-                      <label class="fr-label" for="subvention-equipement">Matériel d'irrigation (%)</label>
-                      <input class="fr-input champ-subvention" type="number" id="subvention-equipement"
-                             min="0" max="100" step="1" value="{{ subventions.equipement | brut }}" inputmode="decimal">
-                    </div>
-                  </div>
-                  <div class="fr-fieldset__element fr-fieldset__element--inline fr-fieldset__element--inline-grow">
-                    <div class="fr-input-group">
-                      <label class="fr-label" for="subvention">Infrastructures d'accès à la ressource (%)</label>
-                      <input class="fr-input champ-subvention" type="number" id="subvention"
-                             min="0" max="100" step="1" value="{{ subventions.acces[ref.sources[0]] | brut }}" inputmode="decimal">
-                    </div>
-                  </div>
-                </fieldset>
+            </fieldset>
+
+            <fieldset class="fr-fieldset bloc-parametre" aria-labelledby="leg-subventions">
+              <legend class="fr-fieldset__legend" id="leg-subventions"><span class="etiquette-bloc">Subvention publique</span></legend>
+              <div class="fr-fieldset__element fr-fieldset__element--inline fr-fieldset__element--inline-grow">
+                <div class="fr-input-group">
+                  <label class="fr-label" for="subvention-equipement">Matériel d'irrigation (%)</label>
+                  <input class="fr-input champ-subvention" type="number" id="subvention-equipement"
+                         min="0" max="100" step="1" value="{{ subventions.equipement | brut }}" inputmode="decimal">
+                </div>
+              </div>
+              <div class="fr-fieldset__element fr-fieldset__element--inline fr-fieldset__element--inline-grow">
+                <div class="fr-input-group">
+                  <label class="fr-label" for="subvention">Infrastructures d'accès à la ressource (%)</label>
+                  <input class="fr-input champ-subvention" type="number" id="subvention"
+                         min="0" max="100" step="1" value="{{ subventions.acces[ref.sources[0]] | brut }}" inputmode="decimal">
+                </div>
               </div>
             </fieldset>
           </form>
@@ -219,11 +218,15 @@
 
       {# ------------------------ Diagnostic du territoire ------------------------ #}
       <section id="diagnostic-territoire" class="fr-mt-5w" aria-labelledby="titre-territoire">
-        <h2 class="fr-h4 titre-section" id="titre-territoire">Diagnostic du territoire</h2>
-        <p class="fr-text--sm texte-mention">Contexte de la commune : tension sur la ressource, usages concurrents, sol et
-          accès à l'eau. Source et méthode au survol de chaque valeur ; seuils de classement dans la feuille
-          « Territoire » du référentiel.</p>
-        <div id="territoire-contenu"><p class="fr-text--sm">Sélectionnez une commune.</p></div>
+        <details class="diagnostic">
+          <summary class="diagnostic__entete">
+            <h2 class="fr-h4 fr-mb-0" id="titre-territoire">Diagnostic du territoire</h2>
+          </summary>
+          <p class="fr-text--sm texte-mention">Contexte de la commune : ressource en eau, sol, usages, accès à l'eau et
+            projections climatiques. Source et méthode au survol des valeurs soulignées ; seuils de classement dans la
+            feuille « Territoire » du référentiel.</p>
+          <div id="territoire-contenu"><p class="fr-text--sm">Sélectionnez une commune.</p></div>
+        </details>
       </section>
 
       {# ------------------- Mes hypothèses (volet Cas personnel) ------------------- #}

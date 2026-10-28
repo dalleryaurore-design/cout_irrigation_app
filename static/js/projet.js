@@ -174,55 +174,14 @@
       " (Sandre)" + (forage && part >= t.zre.seuil ? " : à décocher si la ZRE vise une autre nappe que celle captée." : ".")));
   }
 
-  /* Diagnostic du territoire renvoyé par la simulation : quatre fiches d'indicateurs */
-  var BADGES = { favorable: ["success", "Favorable"], vigilance: ["warning", "Vigilance"],
-                 defavorable: ["error", "Défavorable"], info: ["info", "Information"] };
-  function badge(niveau) {
-    var b = BADGES[niveau] || BADGES.info;
-    return '<span class="fr-badge fr-badge--sm fr-badge--no-icon fr-badge--' + b[0] + '">' + b[1] + "</span>";
-  }
-  var compteurBulles = 0;
+  /* Diagnostic du territoire renvoyé par la simulation : affichage par static/js/territoire.js */
   function afficherTerritoire(t) {
-    if (!t || !t.disponible) {
-      html("territoire-contenu", '<p class="fr-text--sm">' + echapper(t ? t.message : "Sélectionnez une commune.") + "</p>");
-      return;
-    }
-    var fiches = t.fiches.map(function (f) {
-      var lignes = f.indicateurs.map(function (x) {
-        var id = "terr-tt-" + (++compteurBulles);
-        return '<li class="territoire__ligne">' + badge(x.niveau) + ' <span class="territoire__libelle">' +
-          echapper(x.libelle) + '</span> : <span class="valeur-sourcee" tabindex="0" aria-describedby="' + id + '">' +
-          echapper(x.valeur) + '</span><span class="fr-tooltip fr-placement" id="' + id +
-          '" role="tooltip" aria-hidden="true">' + echapper(x.bulle) + "</span></li>";
-      }).join("");
-      var options = "";
-      if (f.options) {
-        options = '<p class="indicateur__libelle fr-mt-2w">Type d\'accès le plus probable</p><ol class="territoire__options">' +
-          f.options.map(function (o) {
-            return "<li>" + badge(o.niveau) + " <strong>" + echapper(o.source) + "</strong>" +
-              (o.retenue ? " <em>(simulé)</em>" : "") + ' <span class="territoire__motifs">— ' +
-              echapper(o.motifs.join(" ; ")) + "</span></li>";
-          }).join("") + "</ol>" +
-          (f.proposee && !f.options.filter(function (o) { return o.retenue && o.source === f.proposee; }).length
-            ? '<button type="button" class="fr-btn fr-btn--sm fr-btn--secondary fr-mt-1w" id="territoire-appliquer" ' +
-              'data-source="' + echapper(f.proposee) + '">Simuler avec « ' + echapper(f.proposee) + " »</button>" : "");
-      }
-      return '<div class="fr-col-12 fr-col-md-6"><div class="indicateur territoire"><p class="indicateur__libelle ' +
-        'indicateur__titre">' + echapper(f.titre) + '</p><ul class="territoire__liste">' +
-        (lignes || '<li class="territoire__ligne">Aucune donnée pour cette commune.</li>') + "</ul>" + options +
-        (f.avertissement ? '<p class="fr-text--xs texte-mention fr-mt-1w fr-mb-0">' + echapper(f.avertissement) + "</p>" : "") +
-        "</div></div>";
-    }).join("");
-    html("territoire-contenu", '<div class="fr-grid-row fr-grid-row--gutters">' + fiches + "</div>");
-    var bouton = $("territoire-appliquer");
-    if (bouton) {
-      bouton.addEventListener("click", function () {
-        $("source").value = bouton.dataset.source;
-        subventionsParDefaut(false);
-        zreParDefaut();
-        planifier();
-      });
-    }
+    window.Territoire.afficher("territoire-contenu", t, function (source) {
+      $("source").value = source;
+      subventionsParDefaut(false);
+      zreParDefaut();
+      planifier();
+    });
   }
 
   /* Agence de l'eau déduite du département (feuille « Departements » du référentiel) */

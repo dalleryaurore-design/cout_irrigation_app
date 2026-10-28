@@ -190,6 +190,7 @@ def _fiche_sol(l, s: _Seuils, sol: Optional[Dict[str, Any]]) -> Dict[str, Any]:
             f"(< {_nb(faible)} mm) : le sol retient peu l'eau, les apports doivent être fréquents et le besoin "
             f"d'irrigation est plus élevé ; élevée (≥ {_nb(elevee)} mm) : le sol tamponne les déficits. "
             + s.source("Sol", "ru_faible")))
+        indicateurs[-1].update(classe=classe, mm=_nb(ru))
         if sol.get("profondeur") is not None:
             indicateurs.append(_ind("Profondeur de sol", f"{_nb(sol['profondeur'], 1)} m", INFO,
                                     "Profondeur de sol de la simulation (BDGSF ou valeur saisie)."))
@@ -218,9 +219,12 @@ def _niveau_debit(v: Optional[float], s: _Seuils) -> str:
 
 
 def _fiche_projections(l, s: _Seuils, proj: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-    indicateurs = []
+    indicateurs, donnees_proj = [], None
     if proj:
         h = proj["horizons"]
+        donnees_proj = {cle: [h[k].get(cle) for k, _ in HORIZONS]
+                        for cle in ("besoin_mm", "bilan_ete", "excedent_hiver")}
+        donnees_proj["culture"] = proj.get("culture")
         serie = lambda cle, dec=0: " → ".join(f"{_nb(h[k][cle], dec)}" for k, _ in HORIZONS)  # noqa: E731
         drias = s.citation("DRIAS_2020")
         b1, b3 = h["H1"].get("besoin_mm"), h["H3"].get("besoin_mm")
@@ -277,7 +281,7 @@ def _fiche_projections(l, s: _Seuils, proj: Optional[Dict[str, Any]]) -> Dict[st
                 f"{_nb(_f(l, 'rech_27c_bas'))} à {_nb(_f(l, 'rech_27c_haut'))} %. Classement à +2,7 °C. "
                 "Recharge annuelle : elle ne dit rien des niveaux d'été, dont dépend le débit d'un forage."))
     return {"id": "projections", "titre": "Projections hydroclimatiques", "indicateurs": indicateurs,
-            "horizons": [libelle for _, libelle in HORIZONS],
+            "horizons": [libelle for _, libelle in HORIZONS], "donnees": donnees_proj,
             "avertissement": "Valeurs par horizon : 2021-2050 → 2041-2070 → 2071-2100 (scénario d'émissions "
                              "modérées RCP4.5) ; recharge des nappes par niveau de réchauffement de la TRACC. La "
                              "dispersion des simulations est un résultat en soi : voir les fourchettes au survol."}
@@ -401,6 +405,117 @@ def _fiche_acces(l, s: _Seuils, ref, source_courante: str) -> Dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
+# Vue synthétique (affichage du diagnostic : eaux superficielles et souterraines, sol, usages, graphiques)
+# ---------------------------------------------------------------------------
+SIGNIFICATION_FORMATION = {
+    "5": "terrain perméable : la pluie s'infiltre et recharge la nappe ; une retenue doit être étanchée.",
+    "6": "terrain peu perméable : infiltration lente, ruissellement modéré.",
+    "7": "terrain imperméable : la pluie ruisselle, favorable au remplissage d'une retenue collinaire ; peu de "
+         "recharge locale de nappe.",
+}
+ETAT_SIMPLE = {"1": "Nappe captive (sous une couche imperméable)", "2": "Nappe libre",
+               "3": "Nappe libre et captive"}
+THEME_SIMPLE = {"1": "des alluvions", "2": "en terrain sédimentaire", "3": "de socle (débit faible et aléatoire)",
+                "4": "de montagne", "5": "en terrain volcanique"}
+
+
+def _restrictions_annuelles(l, t: str) -> Optional[Dict[str, Any]]:
+    """Jours par année à chaque niveau (alerte, alerte renforcée, crise) ; à défaut du détail annuel,
+    moyenne 2016-2025 déduite des jours « au niveau indiqué ou plus grave »."""
+    annees: List[str] = []
+    series: Dict[str, List[float]] = {"alerte": [], "alerte_renforcee": [], "crise": []}
+    for morceau in (l.get(f"{t}_jours_annuels") or "").split(";"):
+        try:
+            annee, valeurs = morceau.split(":")
+            j = [float(x) for x in valeurs.split("/")]
+        except ValueError:
+            continue
+        annees.append(annee)
+        for cle, v in zip(series, j):
+            series[cle].append(v)
+    if annees:
+        return {"annees": annees, **series, "moyenne": False}
+    j_al, j_ar, j_cr = (_f(l, f"{t}_j_alerte"), _f(l, f"{t}_j_alerte_renforcee"), _f(l, f"{t}_j_crise"))
+    if j_al is None or j_ar is None or j_cr is None:
+        return None
+    return {"annees": ["Moyenne 2016-2025"], "alerte": [round(j_al - j_ar, 1)],
+            "alerte_renforcee": [round(j_ar - j_cr, 1)], "crise": [j_cr], "moyenne": True}
+
+
+def _vue(l, s: _Seuils, fiches: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+    ind = {x["libelle"]: x for f in fiches.values() for x in f["indicateurs"]}
+    seuil = s("Tension", "part_zre", 0.5)
+    noms_zre = l.get("zre_noms") or ""
+
+    def zre(part: float) -> Dict[str, Any]:
+        return {"niveau": DEFAVORABLE if part >= seuil else FAVORABLE, "part": part,
+                "bulle": ind["Zone de répartition des eaux (ZRE)"]["bulle"]}
+
+    def restrictions(t: str, nom: str) -> Optional[Dict[str, Any]]:
+        r = _restrictions_annuelles(l, t)
+        if r:
+            r["bulle"] = ind[f"Restrictions sécheresse, {nom}"]["bulle"]
+        return r
+
+    acces = fiches["acces"]
+    nappe = ind.get("Première nappe")
+    aq_etat, aq_theme, aq_rang = _code(l, "aq_etat"), _code(l, "aq_theme"), int(_f(l, "aq_rang") or 1)
+    if l.get("aq_libelle"):
+        simple = (ETAT_SIMPLE.get(aq_etat, "Nappe") + (f" {THEME_SIMPLE[aq_theme]}" if aq_theme in THEME_SIMPLE else "")
+                  + (", proche de la surface" if aq_rang == 1 else f", sous {aq_rang - 1} formation(s) peu perméable(s)"))
+    else:
+        simple = "aucune nappe identifiée sous la commune"
+
+    sol = {k: ind.get(lib) for k, lib in (("ru", "Réserve utile du sol"), ("profondeur", "Profondeur de sol"))}
+    formation = ind.get("Formation géologique affleurante")
+    if formation:
+        formation = dict(formation, nom=l.get("eh_libelle") or "",
+                         signification=SIGNIFICATION_FORMATION.get(_code(l, "eh_nature"), ""))
+
+    sau, secret = _f(l, "sau_irr_pct"), _f(l, "sau_irr_secret")
+    ouvrages = [dict(ind[lib], libelle=court) for lib, court in (
+        ("Ouvrages hydroélectriques", "Ouvrages hydroélectriques"),
+        ("Ouvrages liés à l'eau potable", "Ouvrages d'eau potable"),
+        ("Ouvrages liés à l'irrigation", "Ouvrages d'irrigation"))]
+
+    proj = fiches["projections"]
+    bulles_proj = {x["libelle"]: x["bulle"] for x in proj["indicateurs"]}
+    p = proj.get("donnees") or {}
+    debits = None
+    if l.get("e2_station"):
+        debits = {cle: [_f(l, f"e2_{cle}_{k.lower()}") for k, _ in HORIZONS] for cle in ("qmna", "ete", "hiver")}
+        if all(v is None for serie in debits.values() for v in serie):
+            debits = None
+
+    def bulle(prefixe: str) -> str:
+        return next((b for lib, b in bulles_proj.items() if lib.startswith(prefixe)), "")
+
+    return {
+        "superficielle": {
+            "cours_eau": [dict(x, libelle=lib) for x, lib in zip(acces["indicateurs"][:3], (
+                "Cours d'eau le plus proche", "Cours d'eau de plus de 5 m de large", "Canal"))],
+            "zre": zre(_f(l, "zre_sup_part") or 0), "restrictions": restrictions("sup", "eaux superficielles")},
+        "souterraine": {
+            "nappe": {"valeur": simple, "bulle": nappe["bulle"] if nappe else ""},
+            "zre": zre(_f(l, "zre_sout_part") or 0), "restrictions": restrictions("sou", "eaux souterraines")},
+        "zre_noms": noms_zre,
+        "sol": {"ru": sol["ru"], "profondeur": sol["profondeur"], "formation": formation},
+        "usages": {"sau_irriguee": sau, "secret": bool(secret) and sau is None,
+                   "bulle": ind["Part de la SAU irriguée en 2020"]["bulle"], "ouvrages": ouvrages},
+        "acces": {"options": acces["options"], "proposee": acces["proposee"], "avertissement": acces["avertissement"]},
+        "projections": {
+            "horizons": [lib for _, lib in HORIZONS], "culture": p.get("culture"),
+            "besoin": p.get("besoin_mm"), "bilan_ete": p.get("bilan_ete"),
+            "excedent_hiver": p.get("excedent_hiver"), "debits": debits,
+            "bulles": {"besoin": bulle("Besoin en eau"), "bilan_ete": bulle("Bilan climatique"),
+                       "excedent_hiver": bulle("Excédent hivernal"), "debits": bulle("Débit d'étiage")},
+            "avertissement": "Scénario d'émissions modérées RCP4.5. Débits : changement en % par rapport à 1976-2005 "
+                             "(médiane des simulations Explore2" + (f", station « {l['e2_station']} »"
+                                                                    if l.get("e2_station") else "") + ")."},
+    }
+
+
+# ---------------------------------------------------------------------------
 # Point d'entrée
 # ---------------------------------------------------------------------------
 def diagnostic(ref, chemin: Optional[str], code: str, sol: Optional[Dict[str, Any]] = None,
@@ -413,12 +528,13 @@ def diagnostic(ref, chemin: Optional[str], code: str, sol: Optional[Dict[str, An
                            "territoire/indicateurs_communes.csv absent (outils/preparer_territoire.py)."}
     s = _Seuils(ref, surcharges)
     agence = l.get("agence") or None
+    fiches = [_fiche_tension(l, s), _fiche_usages(l, s), _fiche_sol(l, s, sol), _fiche_projections(l, s, projections),
+              _fiche_acces(l, s, ref, source)]
     return {
         "disponible": True, "code": code, "nom": l.get("nom", ""),
         "agence": agence if agence in ref.agences else None,
         "agence_source": f"circonscription de bassin {s.citation('SANDRE_BASSINS')}",
         "zre": {"sup": _f(l, "zre_sup_part") or 0, "sout": _f(l, "zre_sout_part") or 0,
                 "seuil": s("Tension", "part_zre", 0.5), "noms": l.get("zre_noms") or ""},
-        "fiches": [_fiche_tension(l, s), _fiche_usages(l, s), _fiche_sol(l, s, sol), _fiche_projections(l, s, projections),
-                   _fiche_acces(l, s, ref, source)],
+        "fiches": fiches, "vue": _vue(l, s, {f["id"]: f for f in fiches}),
     }

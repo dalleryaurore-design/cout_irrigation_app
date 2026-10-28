@@ -8,7 +8,7 @@ l'utilisateur, ses surcharges de paramètres et les valeurs agronomiques
 
     besoin (mm) ─► volume appliqué = besoin × taux de couverture × 10 × surface
                 ─► volume prélevé  = volume appliqué ÷ efficience du matériel
-    énergie      = (volume prélevé + volume de remplissage pompé d'une retenue) × prix forfaitaire (CGEDD, 2020)
+    énergie      = (volume prélevé + volume de remplissage pompé d'une retenue) × prix forfaitaire (CGEDD et CGAAER, 2020)
                    remplissage pompé = volume prélevé × part du remplissage assurée par pompage
                    (0 pour une retenue collinaire, alimentée par ruissellement et précipitations)
                    (nul si l'eau est livrée sous pression : compris dans la part volumétrique de l'accès)
@@ -352,7 +352,7 @@ def simuler(ref: Referentiel, e: Dict[str, Any], surcharges: Dict[str, Any], agr
     cout_acces = acc["annuite"] + part_fixe + part_vol
 
     # ============================ ÉNERGIE =================================
-    # Prix forfaitaire, commun à tous les équipements et à toutes les sources (CGEDD, 2020).
+    # Prix forfaitaire, commun à tous les équipements et à toutes les sources (CGEDD et CGAAER, 2020).
     prix_energie_m3 = V("Ressources", "Énergie", "prix_energie_m3", 0.07)
     # L'ASA livre l'eau sous pression : l'énergie est comprise dans sa part volumétrique
     pression_fournie = tsrc == "asa"

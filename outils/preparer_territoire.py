@@ -172,8 +172,8 @@ def etape_zonages():
 
 def etape_restrictions():
     """Jours de restriction par an (moyenne 2016-2025) pour les eaux superficielles (SUP) et
-    souterraines (SOU), par niveau de gravité minimal, et nombre d'années avec au moins un jour
-    de crise. Lecture en flux du JSON (une entrée par commune et par jour)."""
+    souterraines (SOU), par niveau de gravité minimal, nombre d'années avec au moins un jour
+    de crise et détail par année. Lecture en flux du JSON (une entrée par commune et par jour)."""
     motif_commune = re.compile(r'\{"commune":\{"code":"([0-9AB]{5})"')
     # Seuls les jours avec restriction sont lus ; la date suit les niveaux dans chaque objet journalier
     motif_jour = re.compile(r'"(SOU|SUP)":"([a-z_]+)"(?:,"(?:SOU|SUP)":(?:null|"[a-z_]+"))?,"date":"(\d{4})')
@@ -202,6 +202,9 @@ def etape_restrictions():
             for i, niveau in enumerate(NIVEAUX[1:], start=1):  # jours au niveau indiqué ou plus grave
                 ligne[f"{t.lower()}_j_{niveau}"] = round(sum(sum(j[i:]) for j in par_annee) / n, 1)
             ligne[f"{t.lower()}_annees_crise"] = sum(1 for j in par_annee if j[rang["crise"]] > 0)
+            # Détail annuel (graphique du diagnostic) : jours à chaque niveau exact, « année:alerte/renforcée/crise »
+            ligne[f"{t.lower()}_jours_annuels"] = ";".join(
+                f"{a}:" + "/".join(str(x) for x in j[1:]) for a, j in zip(ANNEES_RESTRICTIONS, par_annee))
         lignes.append(ligne)
 
     with zipfile.ZipFile(RESTRICTIONS) as z, z.open(z.infolist()[0]) as fh:

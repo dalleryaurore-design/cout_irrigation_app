@@ -550,6 +550,16 @@ class TestRoutes(unittest.TestCase):
             for x in f["indicateurs"]:
                 self.assertIn(x["niveau"], ("favorable", "vigilance", "defavorable", "info"), x["libelle"])
                 self.assertTrue(x["bulle"], x["libelle"])
+        # Vue synthétique de l'affichage : ZRE souterraine défavorable, séries des graphiques
+        v = d["vue"]
+        self.assertEqual(v["souterraine"]["zre"]["niveau"], "defavorable")
+        self.assertEqual(len(v["superficielle"]["cours_eau"]), 3)
+        r_sup = v["superficielle"]["restrictions"]
+        self.assertEqual({len(r_sup[k]) for k in ("annees", "alerte", "alerte_renforcee", "crise")}, {len(r_sup["annees"])})
+        p = v["projections"]
+        self.assertEqual([len(p[k]) for k in ("besoin", "bilan_ete", "excedent_hiver")], [3] * 3)
+        self.assertEqual(set(p["debits"]), {"qmna", "ete", "hiver"})
+        self.assertIn(v["sol"]["ru"]["classe"], ("faible", "moyenne", "élevée"))
         self.assertFalse(self.client.get("/api/territoire/00000").get_json()["disponible"])
         r = self.client.post("/api/simulation", json={"entrees": entrees()}).get_json()
         self.assertFalse(r["territoire"]["disponible"])
