@@ -118,8 +118,6 @@ def rapport_parcelle(ref: Referentiel, e: Dict[str, Any], res: Dict[str, Any], c
     sans = c["sans_subvention"]
 
     # ---------------------------------------------------------------- En-tête
-    pdf.set_font("Marianne", "B", 8)
-    pdf.cell(0, 4, "RÉPUBLIQUE FRANÇAISE", new_x="LMARGIN", new_y="NEXT")
     pdf.set_font("Marianne", "", 7.5)
     pdf.set_text_color(*GRIS)
     pdf.cell(0, 4, "Secrétariat général à la planification écologique", new_x="LMARGIN", new_y="NEXT")
