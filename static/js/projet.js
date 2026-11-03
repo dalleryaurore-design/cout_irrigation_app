@@ -247,7 +247,7 @@
       equipement: $("equipement").value,
       agence: $("agence").value,
       zre: $("zre").checked,
-      methode_rendement: $("rendement-sgpe") && $("rendement-sgpe").checked ? "sgpe" : "auto",
+      methode_rendement: (document.querySelector('input[name="methode-rendement"]:checked') || {}).value || "reference",
       profondeur_sol_m: etat.saisies.profondeur_sol_m === undefined ? null : etat.saisies.profondeur_sol_m,
       type_retenue: retenue ? retenue.value : "individuelle",
       nb_adherents: parseInt($("nb-adherents").value, 10) || 1,
@@ -581,13 +581,16 @@
       ? res.redevance.agence + ", catégorie " + res.redevance.categorie + " (" + (res.entrees.zre ? "ZRE" : "hors ZRE") +
         "), eaux " + res.redevance.origine + "s" + (res.redevance.incluse ? " — comprise dans le tarif de l'ASA." : ".")
       : "Agence de l'eau non déterminée : sélectionnez une commune.");
-    /* Source retenue automatiquement (besoin : SGPE > MAELIA > référentiel ; rendements : MAELIA >
-       référentiel, ou SGPE si la case « exploratoire » est cochée) et bulles « i » des autres méthodes */
-    var caseSgpe = $("rendement-sgpe");
-    if (caseSgpe) {
-      caseSgpe.disabled = !(a.methodes_rendement || {}).sgpe;
-      caseSgpe.parentNode.title = caseSgpe.disabled ? "Indisponible pour cette culture (Kc ou Ky non renseignés)." : "";
-    }
+    /* Source retenue (besoin : SGPE > MAELIA > référentiel ; rendements : méthode choisie, Référentiel
+       par défaut) et bulles « i » des autres méthodes. Une méthode de rendement indisponible est grisée. */
+    var dispoRdt = a.methodes_rendement || {};
+    [["carte", "Pas de carte MAELIA complète pour cette culture."],
+     ["sgpe", "Indisponible pour cette culture (Kc ou Ky non renseignés)."]].forEach(function (m) {
+      var r = $("rendement-" + m[0]);
+      if (!r) { return; }
+      r.disabled = !dispoRdt[m[0]];
+      r.parentNode.title = r.disabled ? m[1] : "";
+    });
     var sources = a.sources || {};
     var bulles = a.infobulles || {};
     [["agro-rdt-irr", "rdt_irrigue", "q/ha", 1], ["agro-rdt-plu", "rdt_pluvial", "q/ha", 1],
@@ -883,7 +886,7 @@
     etat.zreManuel = true;
     etat.nbUnitesManuel = !!x.nb_unites;
     if (x.nb_unites) { $("nb-unites").value = x.nb_unites; }
-    $("rendement-sgpe").checked = x.methode_rendement === "sgpe";
+    cocher("methode-rendement", ["sgpe", "carte"].indexOf(x.methode_rendement) >= 0 ? x.methode_rendement : "reference");
     subventionsParDefaut(true);
     [["subvention_equipement_pct", "subvention-equipement", "subvEquipementManuel"],
      ["subvention_acces_pct", "subvention", "subvAccesManuel"]].forEach(function (c) {
@@ -985,8 +988,11 @@
           planifier();
         });
       });
-    ["zre", "deja-amorti", "deja-amorti-equipement", "capacite-auto", "rendement-sgpe"].forEach(function (id) {
+    ["zre", "deja-amorti", "deja-amorti-equipement", "capacite-auto"].forEach(function (id) {
       $(id).addEventListener("change", planifier);
+    });
+    document.querySelectorAll('input[name="methode-rendement"]').forEach(function (r) {
+      r.addEventListener("change", planifier);
     });
     $("zre").addEventListener("change", function () { etat.zreManuel = true; zreParDefaut(); });
     document.querySelectorAll('input[name="type-retenue"]').forEach(function (r) {

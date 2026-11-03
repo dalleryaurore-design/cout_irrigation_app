@@ -54,7 +54,7 @@ CHAMPS_SIMULATION = [
     ("subvention_equipement_pct", "Subvention au matériel (%)"),
     ("subvention_acces_pct", "Subvention à l'accès à la ressource (%)"), ("agence", "Agence de l'eau"),
     ("zre", "Zone de répartition des eaux (oui/non)"), ("methode_besoin", "Méthode du besoin en eau (auto, sgpe, carte, reference)"),
-    ("methode_rendement", "Méthode des rendements (auto, ou sgpe pour l'option exploratoire)"),
+    ("methode_rendement", "Méthode des rendements (reference par défaut, carte, sgpe ou auto)"),
     ("ru_mm", "Réserve utile du sol saisie (mm ; vide = carte des sols)"),
     ("profondeur_sol_m", "Profondeur de sol saisie (m ; vide = carte BDGSF)"),
     ("redevance_c_m3", "Redevance saisie (c€/m³ ; vide = taux de l'agence)"),

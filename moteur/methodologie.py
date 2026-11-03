@@ -82,9 +82,9 @@ def methodologie_pdf(ref: Referentiel, validation: Optional[Dict[str, Any]], cat
     pdf.tableau([
         ["Besoin net en eau", "1. SGPE  2. MAELIA  3. Référentiel",
          "SGPE : validée contre CropWat, sensible au sol et au climat local, 21 cultures"],
-        ["Rendements irrigué et pluvial", "1. MAELIA  2. Référentiel",
-         "Modèle de culture calé en France ; statistiques observées à défaut"],
-        ["Rendement pluvial (option)", "SGPE (Ky), case « exploratoire »",
+        ["Rendements irrigué et pluvial", "Référentiel par défaut ; MAELIA au choix",
+         "Statistiques observées ; modèle de culture calé en France en option"],
+        ["Rendement pluvial (option)", "SGPE (Ky), choix « exploratoire »",
          "Non calé sur des rendements observés : pessimiste pour le maïs"],
     ], (44, 52, 82), entete=["Grandeur", "Ordre de préférence", "Justification"], aligne=["LEFT"] * 3, taille=8)
     seuil = ref.valeur("Cultures", "Général", "besoin_plausible_max", None, 450)

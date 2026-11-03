@@ -319,10 +319,17 @@
               {% endif %}
               {% endfor %}
               <p class="indicateur__complement" id="agro-rdt-source"></p>
-              <div class="fr-checkbox-group fr-checkbox-group--sm choix-discret fr-mt-1w">
-                <input type="checkbox" id="rendement-sgpe">
-                <label class="fr-label" for="rendement-sgpe">Rendement pluvial par la méthode SGPE (exploratoire)</label>
-              </div>
+              <fieldset class="fr-fieldset choix-discret fr-mt-1w" id="methode-rendement" aria-labelledby="methode-rendement-legende">
+                <legend class="fr-fieldset__legend fr-text--sm fr-mb-0" id="methode-rendement-legende">Méthode des rendements</legend>
+                {% for code, libelle in [('reference', 'Référentiel'), ('carte', 'Cartes MAELIA'), ('sgpe', 'SGPE, rendement pluvial (exploratoire)')] %}
+                <div class="fr-fieldset__element">
+                  <div class="fr-radio-group fr-radio-group--sm">
+                    <input type="radio" id="rendement-{{ code }}" name="methode-rendement" value="{{ code }}"{% if code == 'reference' %} checked{% endif %}>
+                    <label class="fr-label" for="rendement-{{ code }}">{{ libelle }}</label>
+                  </div>
+                </div>
+                {% endfor %}
+              </fieldset>
             </div>
           </div>
           {% for id, libelle, unite in [('agro-besoin', "Besoin en eau d'irrigation", 'mm'), ('agro-volume', "Volume d'eau d'irrigation prélevé", 'm³')] %}
